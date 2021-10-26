@@ -1,0 +1,6 @@
+- first build token-level data using stanza on sentences without entity markers (like "@@")
+- for the syntax part, remove embeddings of entity markers along with [CLS], [SEP]
+- exp1: test if fine-tuning degrades the performances of the distance probe and the depth probe (even investigate concrete examples) on CHEMPROT first (2021/10/25)
+- network-v1: to use the syntax probe (distance+depth), simply remove four entity markers.
+
+FINISH THIS WORK BEFORE CHRISTMAS BEFORE ITS TOO LATE
