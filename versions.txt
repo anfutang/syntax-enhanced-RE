@@ -4,3 +4,11 @@
 - network-v1: to use the syntax probe (distance+depth), simply remove four entity markers.
 
 FINISH THIS WORK BEFORE CHRISTMAS BEFORE ITS TOO LATE
+
+### commands 
+=== preprocessing
+python3 to_wps.py --data_dir ~/code/corpus/bert_data/chemprot/ --output_dir ~/code/corpus/bert_data/chemprot/
+
+
+
+
