@@ -31,7 +31,7 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
         logger.info(f"early stopping chosen. MAXIMUM number of epochs set to {args.max_num_epochs}.")
         NUM_EPOCHS = args.max_num_epochs
 
-    n_params = sum([p.nelement() for p in model.parameters()])
+    n_params = sum([p.nelement() for p in model.parameters() if p.requires_grad])
     logger.info(f'===number of parameters (pre-trained BERT frozen): {n_params}')
 
     t_total = len(train_dataloader) * NUM_EPOCHS
@@ -162,10 +162,11 @@ def main():
         args.config_name_or_path = config_file_name
 
     config = BertConfig.from_pretrained(args.config_name_or_path)
-    
+
+    """    
     output_dir = os.path.join(args.finetuned_model_path,args.model_type,"training_record")
     if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+        os.makedirs(output_dir)"""
 
     train_dataloader = DataLoader(args.data_dir,"train",args.mode,args.seed,args.batch_size,args.device)
     dev_dataloader = DataLoader(args.data_dir,"dev",args.mode,args.seed,args.batch_size,args.device)
@@ -174,7 +175,7 @@ def main():
     # Evaluate the best model on Test set
     torch.cuda.empty_cache()
     
-    set_seed(args.seed)
+    set_seed(args)
     model = SyntaxBertModel.from_pretrained(pretrained_bert_urls[args.model_type],config=config,mode=args.mode,
                                             layer_index=args.layer_index,probe_type=args.probe_type)
     model.to(args.device)

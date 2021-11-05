@@ -19,8 +19,8 @@ class DataLoader(object):
             self.labels = list(pd.read_csv(os.path.join(path,f"{name}.csv")).label.values)
             num_examples = len(self.labels)
         if mode != "no_syntax":
-            wp_data = pickle.load(os.path.join(path,f"wp_{name}.pkl"),"rb")
-            syntactic_labels = pickle.load(os.path.join(path,f"syntactic_probe_labels_{name}.pkl"),"rb")
+            wp_data = pickle.load(open(os.path.join(path,f"wp_{name}.pkl"),"rb"))
+            syntactic_labels = pickle.load(open(os.path.join(path,f"syntactic_probe_labels_{name}.pkl"),"rb"))
             self.wps = wp_data["wps"]
             self.maps = wp_data["map"]
             self.dist_matrixs = syntactic_labels["distance_matrix"]
@@ -48,8 +48,7 @@ class DataLoader(object):
         else:
             self.data = list(zip(self.wps,self.maps,self.keys,self.relation_labels,self.dist_matrixs,self.depths))
         
-        self.data = [self.data[i:i+batch_size] for i in range(0,num_examples,batch_size)]
-        
+        self.data = [self.data[i:i+batch_size] for i in range(0,num_examples,batch_size)] 
         logger.info(f"{name}: {len(self.data)} batches generated.")
                 
     def __len__(self):
@@ -62,11 +61,11 @@ class DataLoader(object):
             raise IndexError
         batch = self.data[key]
         unzip_batch = list(zip(*batch))
-
+        
         wps = unzip_batch[0]
         max_length = max(map(len,wps))
-        wps = torch.Tensor([wp + [0] * len(max_length-len(wp)) for wp in wps]).to(self.device)
-
+        wps = torch.Tensor([wp + [0] * (max_length-len(wp)) for wp in wps]).long().to(self.device)
+        #print(wps.shape)
         if self.mode == "no_syntax":
             assert len(unzip_batch) == 2, "mode NO_SYNTAX and input data do not match."
             return {"wps":wps,"labels":torch.Tensor([int(i) for i in unzip_batch[1]]).to(self.device)}
@@ -74,14 +73,14 @@ class DataLoader(object):
             assert len(unzip_batch) == 5, "mode PROBE_ONLY and input data do not match."
             return {"wps":wps,
                     "maps":unzip_batch[1],
-                    "keys":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[2]],
+                    "keys":[torch.Tensor(lst).int().to(self.device) for lst in unzip_batch[2]],
                     "dist_matrixs":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[3]],
                     "depths":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[4]]}
         else:
             assert len(unzip_batch) == 6, "mode WITH_SYNTAX and input data do not match."
             return {"wps":wps,
                     "maps":unzip_batch[1],
-                    "keys":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[2]],
+                    "keys":[torch.Tensor(lst).int().to(self.device) for lst in unzip_batch[2]],
                     "labels":torch.Tensor([int(i) for i in unzip_batch[3]]).to(self.device),
                     "dist_matrixs":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[4]],
                     "depths":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[5]]}

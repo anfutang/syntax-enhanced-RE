@@ -4,7 +4,7 @@ import logging
 import torch
 from torch import nn
 from torch.nn import (BCELoss, BCEWithLogitsLoss)
-from transformers import (BertPreTrainedModel, BertPooler, BertModel)
+from transformers import (BertPreTrainedModel, BertModel)
 from utils.losses import syntactic_loss, distance_loss, depth_loss
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,20 @@ def set_seed(args,ensemble_id=0):
     torch.manual_seed(seed)
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(seed)
+
+class BertPooler(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
 
 class SyntaxBertModel(BertPreTrainedModel):
     def __init__(self,config,mode,layer_index=-1,probe_type=None):
@@ -76,10 +90,13 @@ class SyntaxBertModel(BertPreTrainedModel):
                 raise ValueError("fetch outputs of intermediate layers in BERT: NOT implemented yet.")
             sequence_output = self.dropout(sequence_output)
             logits = self.classifier(sequence_output)
+            #print(logits.shape)
             token_logits = []
             for logit, m, key in zip(logits,maps,keys):
-                token_logit = self._from_wps_to_token(logit,m)
+                token_logit = self._from_wps_to_token(logit,m).to(next(self.parameters()).device)
+                #print(token_logit.shape)
                 token_logits.append(torch.index_select(token_logit,0,key))
+                #print(token_logits[-1].shape)
             if self.probe_type == "distance":
                 loss = distance_loss(token_logits,dist_matrixs)
             elif self.probe_type == "depth":
@@ -91,6 +108,6 @@ class SyntaxBertModel(BertPreTrainedModel):
         curr_ix = 0
         token_embs = []
         for i in span_indexes:
-            token_embs.append(torch.mean(wp_embs[curr_ix:i]))
+            token_embs.append(torch.mean(wp_embs[curr_ix:i,:],dim=0).unsqueeze(0))
             curr_ix = i
-        return torch.Tensor(token_embs)
+        return torch.cat(token_embs,dim=0)

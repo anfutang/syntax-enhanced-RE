@@ -29,19 +29,27 @@ def evaluate(dataloader,model,probe_type,predict_only=False):
 
     if probe_type == "distance":
         probe_func = correlation_distance
-        gold_ix = 3
+        gold_attrib = "dist_matrixs"
     elif probe_type == "depth":
         probe_func = correlation_depth
-        gold_ix = 4
+        gold_attrib = "depths"
 
     for batch in dataloader:
         with torch.no_grad():
             loss, logits = model(**batch)[:2]
+     
+            if probe_type == "distance":
+                preds = [((t.unsqueeze(1) - t.unsqueeze(0))**2).sum(-1) for t in logits]
+                #print([t.shape for t in logits])
+                #print([t.shape for t in preds])
+            elif probe_type == "depth":
+                preds = [(t**2).sum(-1) for t in logits]
+            preds = [t.detach().cpu().numpy() for t in preds]
             if not predict_only:
-               preds = logits.detach().cpu().numpy()
-               eval_loss += loss.item()
-               nb_eval_steps += 1
-            probe_func(batch[gold_ix],preds,syntactic_metric_per_length)
+                eval_loss += loss.item()
+                nb_eval_steps += 1
+            golds = [t.detach().cpu().numpy() for t in batch[gold_attrib]]
+            probe_func(golds,preds,syntactic_metric_per_length)
     
     mean_correlations_per_length = {length:np.mean(syntactic_metric_per_length[length]) for length in syntactic_metric_per_length}
     eval_score = np.mean([mean_correlations_per_length[length] for length in mean_correlations_per_length if 5 <= length <= 50])
@@ -78,7 +86,7 @@ def main():
 
     test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
 
-    set_seed(args.seed)
+    set_seed(args)
     input_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
     model = SyntaxBertModel.from_pretrained(input_model_dir,config=config,mode=args.mode,
                                             layer_index=args.layer_index,probe_type=args.probe_type)
