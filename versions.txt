@@ -8,6 +8,9 @@ FINISH THIS WORK BEFORE CHRISTMAS BEFORE ITS TOO LATE
 ### commands 
 === preprocessing
 python3 to_wps.py --data_dir ~/code/corpus/bert_data/chemprot/ --output_dir ~/code/corpus/bert_data/chemprot/
+python3 generate_structural_probe_targets.py --data_dir ~/code/corpus/bert_data/chemprot/ --output_dir ~/code/corpus/bert_data/chemprot/
+
+=== using slurm
 
 
 

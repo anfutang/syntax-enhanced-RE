@@ -4,15 +4,18 @@ unicode_stoplist = [0x2002,0x2005,0x2009,0x200a]
 replacements = {u:'' for u in unicode_stoplist}
 
 class stanza_word:
-    def __init__(self,ix,text,head,deprel,span):
+    def __init__(self,ix,text,head,upos,xpos,deprel,span):
         self.id = ix
         self.text = text
         self.head = head 
+        self.upos = upos
+        self.xpos = xpos
         self.deprel = deprel
         self.span = span
     
     def __repr__(self):
         return '{\n' + f"  id:{self.id}\n" + f"  text:{self.text}\n" + f"  head:{self.head}\n" + \
+                f"  upos:{self.upos}\n" + f"    xpos:{self.xpos}\n" + \
                 f"  deprel:{self.deprel}\n" + f"  span:{self.span}\n" + '}'
 
 ##### deprecated: treat all compounds like A-B (contains only one '-') by seperating it into three words 'A', '-' and 'B'.
@@ -254,9 +257,6 @@ def re_organise_words(cleaned_sent,words,stanza_parser_pretokenized,subj_ix,obj_
         # if a part of a word is tagged as argument, it is considered as a compound
         #assert len(split_ix) % 2 == 0, "the number of splitting points of compound MUST BE even."
         if len(split_ix) > 0:
-            """print(word_start,word_end)
-            print(subj_start,subj_end,obj_start,obj_end)
-            print(word_start,word_end,split_ix)"""
             tmp_compound, tmp_span = [], []
             curr_tmp_ix = word_start
             #print(word_start,word_end,word_text)
@@ -279,16 +279,16 @@ def re_organise_words(cleaned_sent,words,stanza_parser_pretokenized,subj_ix,obj_
             # linked to tokens within the compound according to the syntactic analysis
             for i, w in enumerate(tmp_words):
                 if w.head != 0:
-                    res.append(stanza_word(curr_id+i,tmp_compound[i],pseudo_ix[w.head],w.deprel,
-                                           tmp_span[i]))
+                    res.append(stanza_word(curr_id+i,tmp_compound[i],pseudo_ix[w.head],w.upos,w.xpos,
+                                           w.deprel,tmp_span[i]))
                     new_created_indexes.append(curr_id+i)
                 else:
-                    res.append(stanza_word(curr_id+i,tmp_compound[i],pseudo_ix[w.head],word["deprel"],
-                                           tmp_span[i]))
+                    res.append(stanza_word(curr_id+i,tmp_compound[i],pseudo_ix[w.head],w.upos,w.xpos,
+                                           word["deprel"],tmp_span[i]))
                     remap[word["id"]] = curr_id + i
             offset += len(head_ix) - 1
         else:
-            res.append(stanza_word(word["id"]+offset,word["text"],word["head"],word["deprel"],word["span"]))
+            res.append(stanza_word(word["id"]+offset,word["text"],word["head"],word["upos"],word["xpos"],word["deprel"],word["span"]))
             remap[word["id"]] = word["id"]+offset
     # update syntactic head indexes of words
     for re_w in res:
@@ -344,7 +344,7 @@ def update_deps(deps,m):
         updated_deps.append((m[i1],m[i2],d))
     return updated_deps
 
-def insert_marker(tokens,deps,start,end,marker_text):
+def insert_marker(tokens,pos,deps,start,end,marker_text):
     assert len(tokens) == len(deps), "number of tokens and dependencies not equal."
     token_map = {0:0}
     for i, t in enumerate(tokens):
@@ -358,7 +358,9 @@ def insert_marker(tokens,deps,start,end,marker_text):
     deps = update_deps(deps,token_map)
     tokens = tokens[:start] + [marker_text] * 2 + tokens[start:end] +\
                 [marker_text] * 2 + tokens[end:]
-    summary = {"tokens":tokens,"dependencies":deps}
+    pos = pos[:start] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[start:end] +\
+                [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[end:]
+    summary = {"tokens":tokens,"pos":pos,"dependencies":deps}
     if marker_text == '@':
         summary["subj"] = [start,start+1,end+2,end+3]
     if marker_text == '$':
@@ -367,7 +369,7 @@ def insert_marker(tokens,deps,start,end,marker_text):
         summary["subj-obj"] = [start,start+1,end+2,end+3]
     return summary
 
-def insert_marker_of_two_arguments(tokens,deps,start1,end1,start2,end2,marker1,marker2):
+def insert_marker_of_two_arguments(tokens,pos,deps,start1,end1,start2,end2,marker1,marker2):
     # 1: subject; 2: object;
     assert len(tokens) == len(deps), "number of tokens and dependencies not equal."
     token_map = {0:0}
@@ -386,12 +388,16 @@ def insert_marker_of_two_arguments(tokens,deps,start1,end1,start2,end2,marker1,m
     if end1 <= start2:
         tokens = tokens[:start1] + ['@'] * 2 + tokens[start1:end1] + ['@'] * 2 + tokens[end1:start2] + \
                     ['$'] * 2 + tokens[start2:end2] + ['$'] * 2 + tokens[end2:]
-        summary = {"tokens":tokens,"dependencies":deps,"subj":[start1,start1+1,end1+2,end1+3],
+        pos = pos[:start1] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[start1:end1] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[end1:start2] + \
+                    [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[start2:end2] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[end2:]
+        summary = {"tokens":tokens,"pos":pos,"dependencies":deps,"subj":[start1,start1+1,end1+2,end1+3],
                    "obj":[start2+4,start2+5,end2+6,end2+7]}
     elif end2 <= start1:
         tokens = tokens[:start2] + ['$'] * 2 + tokens[start2:end2] + ['$'] * 2 + tokens[end2:start1] + \
                     ['@'] * 2 + tokens[start1:end1] + ['@'] * 2 + tokens[end1:]
-        summary = {"tokens":tokens,"dependencies":deps,"obj":[start2,start2+1,end2+2,end2+3],
+        pos = pos[:start2] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[start2:end2] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[end2:start1] + \
+                    [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[start1:end1] + [("ENTITY_MARKER","ENTITY_MARKER")] * 2 + pos[end1:]
+        summary = {"tokens":tokens,"pos":pos,"dependencies":deps,"obj":[start2,start2+1,end2+2,end2+3],
                    "subj":[start1+4,start1+5,end1+6,end1+7]}
     else:
         raise ValueError("impossible subject and object span")
@@ -449,6 +455,7 @@ def parse_sentence(sentence,stanza_words,stanza_parser_pretokenized):
            "error during retokenization:word indexes are NOT consecutive!"
     
     tokens = []
+    pos = []
     deps = []
     #print(words)
     for w in words:
@@ -467,6 +474,7 @@ def parse_sentence(sentence,stanza_words,stanza_parser_pretokenized):
             subj_obj_token_end = w.id
         tokens.append(w.text)
         deps.append((w.id,w.head,w.deprel))
+        pos.append((w.upos,w.xpos))
     if subj_token_start == subj_token_end == subj_token_start == subj_token_end == obj_token_start == \
         obj_token_end == -1:
         raise ValueError("no argument found.")
@@ -483,18 +491,18 @@ def parse_sentence(sentence,stanza_words,stanza_parser_pretokenized):
             (obj_token_start == -1 and obj_token_end == -1), "only start or end span is found. (obj)"
     # cases where only one target argument
     if subj_obj_token_start != -1:
-        sent_doc = insert_marker(tokens,deps,subj_obj_token_start,subj_obj_token_end,'¢')
+        sent_doc = insert_marker(tokens,pos,deps,subj_obj_token_start,subj_obj_token_end,'¢')
         return sent_doc, parse_legitimacy_check(sentence,words,sent_doc)
     if subj_token_start != -1 and obj_token_start == -1:
-        sent_doc = insert_marker(tokens,deps,subj_token_start,subj_token_end,'@')
+        sent_doc = insert_marker(tokens,pos,deps,subj_token_start,subj_token_end,'@')
         return sent_doc, parse_legitimacy_check(sentence,words,sent_doc)
     if obj_token_start != -1 and subj_token_start == -1:
-        sent_doc = insert_marker(tokens,deps,obj_token_start,obj_token_end,'$')
+        sent_doc = insert_marker(tokens,pos,deps,obj_token_start,obj_token_end,'$')
         return sent_doc, parse_legitimacy_check(sentence,words,sent_doc)
     assert subj_token_start != -1 and subj_token_end != -1 and obj_token_start != -1 and \
             obj_token_end != -1, "subject or object span detection error."
     # cases where two target argument (most frequent)
-    sent_doc = insert_marker_of_two_arguments(tokens,deps,subj_token_start,subj_token_end,obj_token_start,
+    sent_doc = insert_marker_of_two_arguments(tokens,pos,deps,subj_token_start,subj_token_end,obj_token_start,
                                           obj_token_end,'@','$')
     return sent_doc, parse_legitimacy_check(sentence,words,sent_doc)
 
@@ -517,6 +525,7 @@ def parse_legitimacy_check(original_sentence,parse_words,summary):
     #====================================
     ## words are stanza object: words
     w2w_deps_stanza = get_deps_word_to_word(parse_words)
+    #pos_stanza = [(w.upos,w.xpos) for w in parse_words]
     #1)
     tokens = summary["tokens"]
 
@@ -561,6 +570,35 @@ def parse_legitimacy_check(original_sentence,parse_words,summary):
         if not tmp:
             print("wrong subject-obj indexes.")
             return False
+    
+    #4)
+    marker_indexes = []
+    #summary_pos_no_marker = []
+    for i, p in enumerate(summary["pos"]):
+        if p[0] == "ENTITY_MARKER":
+            marker_indexes.append(i)
+    """
+    if summary_pos_no_marker != pos_stanza:
+        print("pos tags error!")
+        return False"""
+    assert len(marker_indexes) % 2 == 0, "number of entity markers not possible to be odd."
+    if len(marker_indexes) == 4:
+        if "subj" in summary and set(marker_indexes) != set(["subj"]):
+            print("SUBJ: entity marker POS-TAG inserted at wrong position.")
+            return False
+        if "obj" in summary and set(marker_indexes) != set(summary["obj"]):
+            print("OBJ: entity marker POS-TAG inserted at wrong position.")
+            return False
+        if "subj-obj" in summary and set(marker_indexes) != set(summary["subj-obj"]):
+            print("SUBJ-OBJ: entity marker POS-TAG inserted at wrong position.")
+            return False
+    else:
+        assert len(marker_indexes) == 8, "IMPOSSIBLE number of entity markers."
+        assert "subj" in summary and "obj" in summary, "number of entity markers and entity existance NOT MATCHED."
+        if set(marker_indexes) != set(summary["subj"]+summary["obj"]):
+            print("SUBJ & OBJ: entity marker POS-TAG inserted at wrong position.")
+            return False
+
     return True
 
 def transform(sent):

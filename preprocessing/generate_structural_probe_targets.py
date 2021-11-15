@@ -15,6 +15,8 @@ import numpy as np
 import pandas as pd
 import pickle
 from tqdm import tqdm
+from utils.constant import punct_upos_tags, punct_xpos_tags
+
 
 def get_pair_wise_words(i1,i2,graph):
     if i1 == i2:
@@ -71,6 +73,15 @@ def build_depth_lst(graph,ix2id,length,root_id):
         to_visit = list(tmp_to_visit)
         dist += 1
     return [res[ix2id[i]] for i in range(length)]
+
+def build_mask_no_punct(pos):
+    mask = []
+    for p1, p2 in pos:
+        if p1 not in punct_upos_tags and p2 not in punct_xpos_tags:
+            mask.append(1)
+        else:
+            mask.append(0)
+    return mask
 
 def build_targets(deps):
     # given the dependency parse of a sentence, return the distance matrix and the sequence of word depths
