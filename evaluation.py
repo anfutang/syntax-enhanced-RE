@@ -94,7 +94,7 @@ def main():
 
     test_score = evaluate(test_dataloader,model,args.probe_type,True)
     with open("./probe_results.txt","a+") as f:
-        f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{test_score}\n")
+        f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{test_score}\n")
     
     end_time = time.time()
     logger.info(f"time consumed (inference): {(end_time-start_time):.3f} s.")
