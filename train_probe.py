@@ -171,13 +171,12 @@ def main():
     train_dataloader = DataLoader(args.data_dir,"train",args.mode,args.seed,args.batch_size,args.device)
     dev_dataloader = DataLoader(args.data_dir,"dev",args.mode,args.seed,args.batch_size,args.device)
 
-    all_dev_loss, all_dev_scores = [], []
     # Evaluate the best model on Test set
     torch.cuda.empty_cache()
     
     set_seed(args)
     model = SyntaxBertModel.from_pretrained(pretrained_bert_urls[args.model_type],config=config,mode=args.mode,
-                                            layer_index=args.layer_index,probe_type=args.probe_type)
+                                            layer_index=args.layer_index,probe_type=args.probe_type,probe_rank=args.probe_rank)
     model.to(args.device)
     #freeze the BERT
     for param in model.bert.parameters():

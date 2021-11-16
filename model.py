@@ -51,9 +51,10 @@ class SyntaxBertModel(BertPreTrainedModel):
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
             #self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(class_weights)) 
         elif mode == "probe_only":
-            self.classifier = nn.Linear(config.hidden_size,config.probe_dim)          
+            self.classifier = nn.Linear(config.hidden_size,self.probe_dim)          
  
-        logger.info(f"SyntaxBERT loaded: mode={mode}; layer index={layer_index}; probe type={probe_type}; probe dimension={self.probe_dim}")
+        logger.info(f"SyntaxBERT loaded: num of labels={config.num_labels}; mode={mode}; layer index={layer_index}; " + \
+                    f"probe type={probe_type}; probe dimension={self.probe_dim}")
 
         self.init_weights()
 
