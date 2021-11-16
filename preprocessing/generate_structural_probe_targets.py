@@ -77,16 +77,18 @@ def build_depth_lst(graph,ix2id,length,root_id):
 def build_mask_no_punct(pos):
     mask = []
     for p1, p2 in pos:
+        if p1 == "ENTITY_MARKER":
+            continue
         if p1 not in punct_upos_tags and p2 not in punct_xpos_tags:
             mask.append(1)
         else:
             mask.append(0)
     return mask
 
-def build_targets(deps):
+def build_targets(pos,deps):
     # given the dependency parse of a sentence, return the distance matrix and the sequence of word depths
     graph = defaultdict(list)
-    for i,h,d in deps:
+    for i,h,_ in deps:
         if h == 0:
             root = i
             continue
@@ -97,54 +99,45 @@ def build_targets(deps):
 
     mat = build_dist_matrix(graph,ix2id,L)
     depths = build_depth_lst(graph,ix2id,L,root)
-    assert len(mat) == len(depths) == L, "length of distance of matrix or depth sequence not equal to the number of syntactic tokens."
+    mask = build_mask_no_punct(pos)
+    assert len(mat) == len(depths) == len(mask) == L, "length of distance of matrix | depth | mask sequence not equal to the number of syntactic tokens."
 
-    return mat, depths, sorted(graph.keys())
+    return mat, depths, mask, sorted(graph.keys())
+
+def build_labels(args,ty):
+    data = pickle.load(open(os.path.join(args.data_dir,f"{ty}.pkl"),"rb"))
+    dist_mats = []
+    depths = []
+    masks = []
+    keys = []
+
+    for d in tqdm(data,desc=ty):
+        tmp_dist_mat, tmp_depths, tmp_mask, tmp_keys = build_targets(d["pos"],d["dependencies"])
+        dist_mats.append(tmp_dist_mat)
+        depths.append(tmp_depths)
+        masks.append(tmp_mask)
+        keys.append(tmp_keys)
+
+    assert len(dist_mats) == len(depths) == len(masks) == len(keys) == len(data), f"{ty}: length of outputs on train not equal to original files."
+    with open(os.path.join(args.output_dir,f"syntactic_probe_labels_{ty}.pkl"),"wb") as f:
+        pickle.dump({"distance_matrix":dist_mats,"depths":depths,"mask":masks,"keys":keys},f,pickle.HIGHEST_PROTOCOL)
+
+#========== as this is the final step of data preprocessing, we do a final check here. ==========
+#========== we assume that all generated files (results of to_tokens.py, to_wps.py and this script) are saved under the same directory 
+# HOW TO obtain tokens from wordpieces and remove entity markers?
+# there are three files: token_level data (T), wp_level_data (W), syntactic_label_data (S)
+# 1) use map (W["map"]) and wordpieces (W["wps"]) to restore token sequence  --> wordpieces TO tokens
+# 2) select by indexing the token sequence obtained in 1) using the key (S["keys"])  --> REMOVE entity markers and [CLS], [SEP]
+# 3) "disable" those punctuation tokens by applying masks (S["masks"]) --> MASK punctuations
 
 def main(args):
-    train = pickle.load(open(os.path.join(args.data_dir,"train.pkl"),"rb"))
-    dev = pickle.load(open(os.path.join(args.data_dir,"dev.pkl"),"rb"))
-    test = pickle.load(open(os.path.join(args.data_dir,"test.pkl"),"rb"))
-
-    dist_mats_train = []
-    depths_train = []
-    keys_train = []
-    for d in tqdm(train,desc="train"):
-        tmp_dist_mat, tmp_depths, tmp_keys = build_targets(d["dependencies"])
-        dist_mats_train.append(tmp_dist_mat)
-        depths_train.append(tmp_depths)
-        keys_train.append(tmp_keys)
-    assert len(dist_mats_train) == len(depths_train) == len(keys_train) == len(train), "length of outputs on train not equal to original files."
-    with open(os.path.join(args.output_dir,"syntactic_probe_labels_train.pkl"),"wb") as f:
-        pickle.dump({"distance_matrix":dist_mats_train,"depths":depths_train,"keys":keys_train},f,pickle.HIGHEST_PROTOCOL)
-
-    dist_mats_dev = []
-    depths_dev = []
-    keys_dev = []
-    for d in tqdm(dev,desc="dev"):
-        tmp_dist_mat, tmp_depths, tmp_keys = build_targets(d["dependencies"])
-        dist_mats_dev.append(tmp_dist_mat)
-        depths_dev.append(tmp_depths)
-        keys_dev.append(tmp_keys)
-    assert len(dist_mats_dev) == len(depths_dev) == len(keys_dev) == len(dev), "length of outputs on dev not equal to original files."
-    with open(os.path.join(args.output_dir,"syntactic_probe_labels_dev.pkl"),"wb") as f:
-        pickle.dump({"distance_matrix":dist_mats_dev,"depths":depths_dev,"keys":keys_dev},f,pickle.HIGHEST_PROTOCOL)
-
-    dist_mats_test = []
-    depths_test = []
-    keys_test = []
-    for d in tqdm(test,desc="test"):
-        tmp_dist_mat, tmp_depths, tmp_keys = build_targets(d["dependencies"])
-        dist_mats_test.append(tmp_dist_mat)
-        depths_test.append(tmp_depths)
-        keys_test.append(tmp_keys)
-    assert len(dist_mats_test) == len(depths_test) == len(keys_test) == len(test), "length of outputs on test not equal to original files."
-    with open(os.path.join(args.output_dir,"syntactic_probe_labels_test.pkl"),"wb") as f:
-        pickle.dump({"distance_matrix":dist_mats_test,"depths":depths_test,"keys":keys_test},f,pickle.HIGHEST_PROTOCOL)    
+    build_labels(args,"train")
+    build_labels(args,"dev")
+    build_labels(args,"test")
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="generate targets (labels) for the structural probe designed for BERT.")
-     
+
     parser.add_argument("--data_dir", default=None, type=str, required=True,
                          help="path to token-level data files (results of to_tokens.py)")
     parser.add_argument("--output_dir", default=None, type=str, 

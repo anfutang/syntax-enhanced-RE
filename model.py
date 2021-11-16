@@ -32,12 +32,17 @@ class BertPooler(nn.Module):
         return pooled_output
 
 class SyntaxBertModel(BertPreTrainedModel):
-    def __init__(self,config,mode,layer_index=-1,probe_type=None):
+    def __init__(self,config,mode,layer_index=-1,probe_type=None,probe_rank=-1):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.mode = mode
         self.probe_type = probe_type
         self.layer_index = layer_index
+        self.num_bert_layers = config.num_hidden_layers
+        if probe_rank == -1:
+            self.probe_dim = config.hidden_size
+        else:
+            self.probe_dim = probe_rank
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -46,15 +51,16 @@ class SyntaxBertModel(BertPreTrainedModel):
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
             #self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(class_weights)) 
         elif mode == "probe_only":
-            self.classifier = nn.Linear(config.hidden_size,config.hidden_size)          
+            self.classifier = nn.Linear(config.hidden_size,config.probe_dim)          
  
-        logger.info(f"SyntaxBERT loaded: mode={mode}; layer index={layer_index}; probe type={probe_type}")
+        logger.info(f"SyntaxBERT loaded: mode={mode}; layer index={layer_index}; probe type={probe_type}; probe dimension={self.probe_dim}")
 
         self.init_weights()
 
     def forward(self,
                 wps=None,
                 maps=None,
+                masks=None,
                 keys=None,
                 dist_matrixs=None,
                 depths=None,
@@ -78,29 +84,27 @@ class SyntaxBertModel(BertPreTrainedModel):
             return ((loss,) + output) if loss is not None else output
 
         elif self.mode == "probe_only":
-            if self.layer_index == -1: # use the output of last layer
+            if self.layer_index == 0:
+                sequence_output = self.bert.embeddings(input_ids=wps)
+            else: # use the output of the indicated layer
                 outputs = self.bert(input_ids=wps,
                                     attention_mask=attention_mask,
                                     token_type_ids=token_type_ids,
-                                    position_ids=position_ids)
-                sequence_output = outputs[0]
-            elif self.layer_index == 0:
-                sequence_output = self.bert.embeddings(input_ids=wps)
-            else:
-                raise ValueError("fetch outputs of intermediate layers in BERT: NOT implemented yet.")
+                                    position_ids=position_ids,
+                                    output_hidden_states=True)
+                assert len(outputs[2]) == self.num_bert_layers, "failed fetching hidden states from all BERT layers."
+                sequence_output = outputs[2][self.layer_index-1]
             sequence_output = self.dropout(sequence_output)
             logits = self.classifier(sequence_output)
             #print(logits.shape)
             token_logits = []
-            for logit, m, key in zip(logits,maps,keys):
-                token_logit = self._from_wps_to_token(logit,m).to(next(self.parameters()).device)
-                #print(token_logit.shape)
+            for logit, ma, key, mask in zip(logits,maps,keys,masks):
+                token_logit = self._from_wps_to_token(logit,ma).to(next(self.parameters()).device)
                 token_logits.append(torch.index_select(token_logit,0,key))
-                #print(token_logits[-1].shape)
             if self.probe_type == "distance":
-                loss = distance_loss(token_logits,dist_matrixs)
+                loss = distance_loss(token_logits,dist_matrixs,mask)
             elif self.probe_type == "depth":
-                loss = depth_loss(token_logits,depths)
+                loss = depth_loss(token_logits,depths,mask)
             output = (token_logits,)
             return ((loss,) + output) if loss is not None else output
 
