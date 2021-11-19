@@ -49,7 +49,8 @@ def evaluate(dataloader,model,probe_type,predict_only=False):
                 eval_loss += loss.item()
                 nb_eval_steps += 1
             golds = [t.detach().cpu().numpy() for t in batch[gold_attrib]]
-            probe_func(golds,preds,syntactic_metric_per_length)
+            masks = [t.eq(0).detach().cpu().numpy() for t in batch["masks"]]
+            probe_func(golds,preds,masks,syntactic_metric_per_length)
     
     mean_correlations_per_length = {length:np.mean(syntactic_metric_per_length[length]) for length in syntactic_metric_per_length}
     eval_score = np.mean([mean_correlations_per_length[length] for length in mean_correlations_per_length if 5 <= length <= 50])
@@ -74,11 +75,14 @@ def main():
     args.device = device
 
     # Setup logging
-    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename="inference_log",filemode='w')
+    log_fn = "inference_log"
+    if args.probe_only_no_train:
+        log_fn = "inference_log_no_trained_probe"
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename=log_fn,filemode='w')
     logger.warning("device: %s, n_gpu: %s",device, args.n_gpu)
 
     if not args.config_name_or_path:
-        config_file_name = f"./config/{args.model_type}.json"
+        config_file_name = f"syntax-enhanced-RE/config/{args.model_type}.json"
         assert os.path.exists(config_file_name), "requested BERT model variant not in the preset. You can place the corresponding config file under the folder /config/"
         args.config_name_or_path = config_file_name
 
@@ -88,12 +92,23 @@ def main():
 
     set_seed(args)
     input_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    train_probe = True
+    if args.probe_only_no_train:
+        assert args.mode == "probe_only", "set the option probe_only_no_train ONLY WHEN the mode is PROBE_ONLY"
+        train_probe = False
+        input_model_dir = pretrained_bert_urls[args.model_type]
+
     model = SyntaxBertModel.from_pretrained(input_model_dir,config=config,mode=args.mode,
-                                            layer_index=args.layer_index,probe_type=args.probe_type)
+                                            layer_index=args.layer_index,probe_type=args.probe_type,train_probe=train_probe)
     model.to(args.device)
 
     test_score = evaluate(test_dataloader,model,args.probe_type,True)
-    with open("./probe_results.txt","a+") as f:
+    if args.probe_only_no_train:
+        output_fn = "./no_trained_probe_results.txt"
+    else:
+        output_fn = "./probe_results.txt"
+
+    with open(output_fn,"a+") as f:
         f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{test_score}\n")
     
     end_time = time.time()

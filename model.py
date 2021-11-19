@@ -32,12 +32,13 @@ class BertPooler(nn.Module):
         return pooled_output
 
 class SyntaxBertModel(BertPreTrainedModel):
-    def __init__(self,config,mode,layer_index=-1,probe_type=None,probe_rank=-1):
+    def __init__(self,config,mode,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.mode = mode
         self.probe_type = probe_type
         self.layer_index = layer_index
+        self.train_probe = train_probe
         self.num_bert_layers = config.num_hidden_layers
         if probe_rank == -1:
             self.probe_dim = config.hidden_size
@@ -85,27 +86,27 @@ class SyntaxBertModel(BertPreTrainedModel):
             return ((loss,) + output) if loss is not None else output
 
         elif self.mode == "probe_only":
-            if self.layer_index == 0:
-                sequence_output = self.bert.embeddings(input_ids=wps)
-            else: # use the output of the indicated layer
-                outputs = self.bert(input_ids=wps,
+            # use the output of the indicated layer
+            outputs = self.bert(input_ids=wps,
                                     attention_mask=attention_mask,
                                     token_type_ids=token_type_ids,
                                     position_ids=position_ids,
                                     output_hidden_states=True)
-                assert len(outputs[2]) == self.num_bert_layers, "failed fetching hidden states from all BERT layers."
-                sequence_output = outputs[2][self.layer_index-1]
-            sequence_output = self.dropout(sequence_output)
-            logits = self.classifier(sequence_output)
-            #print(logits.shape)
+            assert len(outputs[2]) == self.num_bert_layers + 1, "failed fetching hidden states from all BERT layers."
+            sequence_output = outputs[2][self.layer_index]
+            if self.train_probe:
+                sequence_output = self.dropout(sequence_output)
+                logits = self.classifier(sequence_output)
+            else:
+                logits = sequence_output
             token_logits = []
             for logit, ma, key, mask in zip(logits,maps,keys,masks):
                 token_logit = self._from_wps_to_token(logit,ma).to(next(self.parameters()).device)
                 token_logits.append(torch.index_select(token_logit,0,key))
             if self.probe_type == "distance":
-                loss = distance_loss(token_logits,dist_matrixs,mask)
+                loss = distance_loss(token_logits,dist_matrixs,masks)
             elif self.probe_type == "depth":
-                loss = depth_loss(token_logits,depths,mask)
+                loss = depth_loss(token_logits,depths,masks)
             output = (token_logits,)
             return ((loss,) + output) if loss is not None else output
 

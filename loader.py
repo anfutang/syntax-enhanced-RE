@@ -26,7 +26,7 @@ class DataLoader(object):
             self.maps = wp_data["map"]
             self.dist_matrixs = label_data["distance_matrix"]
             self.depths = label_data["depths"]
-            self.masks = label_data["masks"]
+            self.masks = label_data["mask"]
             self.keys = label_data["keys"]
             num_examples = len(self.depths)
 

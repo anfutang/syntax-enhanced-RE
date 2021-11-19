@@ -33,6 +33,7 @@ def get_args():
                                                                          "-with_syntax: syntax-driven finetune on RE task using extra syntactic loss items.")
     parser.add_argument("--probe_type",type=str,help="choose the type of probe; only set this option if mode is set to PROBE_ONLY. Under the mode WITH_SYNTAX,"
                                                      "all probe losses will be used.")
+    parser.add_argument("--probe_only_no_train",action="store_true",help="only set this when probe_type is PROBE_ONLY; if set, raw representations from BERT will be used without training a linear classifier.")
     parser.add_argument("--layer_index",type=int,default=12,help="indicate outputs of which layer in BERT to use.")
     parser.add_argument("--probe_rank",type=int,default=-1,help="the linear transformation rank for chosen syntactic probe.")
     parser.add_argument("--batch_size", default=32, type=int)

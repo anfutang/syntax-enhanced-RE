@@ -36,8 +36,7 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
 
     t_total = len(train_dataloader) * NUM_EPOCHS
     
-    #print(f"{len(train_dataloader)},{args.train_batch_size}")
-    logger.info(f"===number of epochs:{NUM_EPOCHS}; number of steps:{t_total}")
+    logger.info(f"===number of epochs:{NUM_EPOCHS}; number of steps:{t_total}; learning rate:{args.learning_rate}")
     optimizer = Adam(model.parameters(),lr=args.learning_rate)
 
     # Train
@@ -50,7 +49,7 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
     logging_loss = 0.0
     min_loss, prev_dev_loss = np.inf, np.inf
     max_score, prev_dev_score = -np.inf, -np.inf
-    #training_hist = []
+    training_hist = []
     model.zero_grad()
 
     dev_loss_record = []
@@ -86,38 +85,27 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
 
         logger.info(f"validation loss = {dev_loss} | validation F1-score = {dev_score} | epoch = {epoch}")
 
-        """if args.monitor == "loss" and dev_loss < min_loss:
+        if args.monitor == "loss" and dev_loss < min_loss:
             min_loss = dev_loss
-            best_epoch = epoch
-            
             # save model
-            output_dir = os.path.join(args.finetuned_model_path,best_model_dir)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
             model.save_pretrained(output_dir)
             torch.save(args, os.path.join(output_dir, 'training_args.bin'))
             logger.info("new best model! saved.")
         
         if args.monitor == "score" and dev_score > max_score:
             max_score = dev_score
-            best_epoch = epoch
-
             # save model
-            output_dir = os.path.join(args.finetuned_model_path,best_model_dir)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
             model.save_pretrained(output_dir)
             torch.save(args,os.path.join(output_dir,"training_args.bin"))
             logger.info("new best model! saved.")
         
-        if args.early_stopping and args.monitor == "os.path.join(args.output_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")loss":
+        if args.early_stopping and args.monitor == "loss":
             if dev_loss < prev_dev_loss:
                 training_hist.append(True)
             else:
                 training_hist.append(False)
                 if len(training_hist) > args.patience and not np.any(training_hist[-args.patience:]):
-                    logger.info(f"early stopping triggered: best loss on validation set: {min_loss} at epoch {best_epoch}.")
-                    #train_iterator.close()
+                    logger.info(f"early stopping triggered: best loss on validation set: {min_loss}.")
                     break
             prev_dev_loss = dev_loss
 
@@ -127,15 +115,12 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
             else:
                 training_hist.append(False)
                 if len(training_hist) > args.patience and not np.any(training_hist[-args.patience:]):
-                    logger.info(f"early stopping triggered: best F-score on validation set: {max_score} at {best_epoch}.")
-                    #train_iterator.close()
+                    logger.info(f"early stopping triggered: best F-score on validation set: {max_score}.")
                     break
-            prev_dev_score = dev_score"""
+            prev_dev_score = dev_score
 
         if epoch + 1 == NUM_EPOCHS:
             break
-    model.save_pretrained(output_dir)
-    torch.save(args, os.path.join(output_dir, 'training_args.bin'))
 
     return dev_loss_record, dev_score_record
 
@@ -152,21 +137,20 @@ def main():
     args.n_gpu = torch.cuda.device_count()
     args.device = device
 
+    if not os.path.exists("./logging/"):
+        os.makedirs("./logging/")
+
     # Setup logging
-    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename="training_log",filemode='w')
+    logging_fn = f"training_log_{args.model_type}_{args.probe_type}_probe_{args.layer_index}"
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename=os.path.join("./logging/",logging_fn),filemode='w')
     logger.warning("device: %s, n_gpu: %s",device, args.n_gpu)
 
     if not args.config_name_or_path:
-        config_file_name = f"./config/{args.model_type}.json"
+        config_file_name = f"syntax-enhanced-RE/config/{args.model_type}.json"
         assert os.path.exists(config_file_name), "requested BERT model variant not in the preset. You can place the corresponding config file under the folder /config/"
         args.config_name_or_path = config_file_name
 
     config = BertConfig.from_pretrained(args.config_name_or_path)
-
-    """    
-    output_dir = os.path.join(args.finetuned_model_path,args.model_type,"training_record")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)"""
 
     train_dataloader = DataLoader(args.data_dir,"train",args.mode,args.seed,args.batch_size,args.device)
     dev_dataloader = DataLoader(args.data_dir,"dev",args.mode,args.seed,args.batch_size,args.device)
@@ -183,10 +167,13 @@ def main():
         param.requires_grad = False
 
     output_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    if not os.path.exists(output_model_dir):
+        os.makedirs(output_model_dir)
+
     loss_record, score_record = train(args,train_dataloader,dev_dataloader,model,output_model_dir)
 
     df_record = pd.DataFrame({"loss":loss_record,"score":score_record})
-    df_record.to_csv(os.path.join(output_model_dir,"training_best_epochs.csv"),index=False)
+    df_record.to_csv(os.path.join(output_model_dir,"training_record.csv"),index=False)
     
     end_time = time.time()
     logger.info(f"time consumed (training): {(end_time-start_time):.3f} s.")

@@ -9,6 +9,8 @@ def syntactic_loss(output,masks,dist_matrix,depths):
 def distance_loss(output,target,masks):
     dist_loss = torch.zeros(1,dtype=torch.float,requires_grad=True).to(target[0].device)
     for sent_embs, gold_matrix, mask in zip(output,target,masks):
+        #print(sent_embs.shape,gold_matrix.shape,mask.shape)
+        #print(mask)
         assert sent_embs.shape[0] == gold_matrix.shape[0] == mask.shape[0], "sentence hidden state shape | gold distance matrix shape | punctuation mask shape NOT MATCHED."
         tmp_length = len(gold_matrix)
         pred_matrix = ((sent_embs.unsqueeze(1)-sent_embs.unsqueeze(0))**2).sum(-1)
@@ -28,6 +30,6 @@ def depth_loss(output,target,masks):
         pred_depths = (sent_embs**2).sum(-1)
         assert pred_depths.shape[0] == tmp_length, "predicted depths not in good shape."
         real_length = mask.eq(0).sum().item()
-        depth_loss += torch.abs(pred_depths - gold_depths**2).masked_fill_(mask.unsqueeze(0),0).masked_fill_(mask.unsqueeze(1),0).sum() / (real_length ** 2) 
-    return depth_loss / len(depth_loss)
+        depth_loss += torch.abs(pred_depths - gold_depths**2).masked_fill_(mask,0).sum() / real_length
+    return depth_loss / len(target)
 
