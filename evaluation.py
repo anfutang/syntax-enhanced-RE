@@ -21,7 +21,7 @@ from utils.constant import pretrained_bert_urls
 transformers.logging.set_verbosity_error()
 logger = logging.getLogger(__name__)
 
-def evaluate(dataloader,model,probe_type,predict_only=False):
+def evaluate(dataloader,model,probe_type,predict_only=False,return_prediction=False):
     eval_loss = 0.0
     nb_eval_steps = 0
     syntactic_metric_per_length = defaultdict(list)
@@ -33,6 +33,9 @@ def evaluate(dataloader,model,probe_type,predict_only=False):
     elif probe_type == "depth":
         probe_func = correlation_depth
         gold_attrib = "depths"
+    
+    if return_prediction:
+        all_preds = []
 
     for batch in dataloader:
         with torch.no_grad():
@@ -45,6 +48,8 @@ def evaluate(dataloader,model,probe_type,predict_only=False):
             elif probe_type == "depth":
                 preds = [(t**2).sum(-1) for t in logits]
             preds = [t.detach().cpu().numpy() for t in preds]
+            if return_prediction:
+                all_preds += preds
             if not predict_only:
                 eval_loss += loss.item()
                 nb_eval_steps += 1
@@ -59,7 +64,10 @@ def evaluate(dataloader,model,probe_type,predict_only=False):
         eval_loss = eval_loss / nb_eval_steps
         return eval_loss, eval_score
     else:
-        return eval_score
+        eva_outputs = (eval_score,)
+        if return_prediction:
+            eva_outputs += ([list(l) for l in all_preds],)
+        return eval_outputs
 
 def main():
     start_time = time.time()
@@ -91,7 +99,11 @@ def main():
     test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
 
     set_seed(args)
-    input_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    if args.model == "probe_only":
+        input_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    else:
+        input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}")    
+
     train_probe = True
     if args.probe_only_no_train:
         assert args.mode == "probe_only", "set the option probe_only_no_train ONLY WHEN the mode is PROBE_ONLY"
@@ -102,14 +114,19 @@ def main():
                                             layer_index=args.layer_index,probe_type=args.probe_type,train_probe=train_probe)
     model.to(args.device)
 
-    test_score = evaluate(test_dataloader,model,args.probe_type,True)
+    eva_outputs = evaluate(test_dataloader,model,args.probe_type,True,args.save_predictions)
     if args.probe_only_no_train:
         output_fn = "./no_trained_probe_results.txt"
     else:
         output_fn = "./probe_results.txt"
 
     with open(output_fn,"a+") as f:
-        f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{test_score}\n")
+        f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{eva_outputs[0]}\n")
+
+    if len(eva_outputs) > 1:
+        with open(os.path.join(input_model_dir,"preds.pkl"),"wb") as f:
+            pickle.dump(eva_outputs[1],f,pickle.HIGHEST_PROTOCOL)
+            logger.info("probe predictions saved.")
     
     end_time = time.time()
     logger.info(f"time consumed (inference): {(end_time-start_time):.3f} s.")

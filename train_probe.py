@@ -141,7 +141,11 @@ def main():
         os.makedirs("./logging/")
 
     # Setup logging
-    logging_fn = f"training_log_{args.model_type}_{args.probe_type}_probe_{args.layer_index}"
+    if args.mode == "probe_only":
+        logging_fn = f"training_log_{args.model_type}_{args.mode}_{args.probe_type}_probe_{args.layer_index}"
+    else:
+        logging_fn = f"training_log_{args.model_type}_{args.mode}"
+
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename=os.path.join("./logging/",logging_fn),filemode='w')
     logger.warning("device: %s, n_gpu: %s",device, args.n_gpu)
 
@@ -166,7 +170,11 @@ def main():
     for param in model.bert.parameters():
         param.requires_grad = False
 
-    output_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    if args.mode == "probe_only":
+        output_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    else:
+        output_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}")
+
     if not os.path.exists(output_model_dir):
         os.makedirs(output_model_dir)
 
