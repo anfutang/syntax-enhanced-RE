@@ -3,9 +3,10 @@ import random
 import logging
 import torch
 from torch import nn
-from torch.nn import (BCELoss, BCEWithLogitsLoss)
+from torch.nn import (BCEWithLogitsLoss,CrossEntropyLoss)
 from transformers import (BertPreTrainedModel, BertModel)
 from utils.losses import syntactic_loss, distance_loss, depth_loss
+from utils.constant import class_weights
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class BertPooler(nn.Module):
         return pooled_output
 
 class SyntaxBertModel(BertPreTrainedModel):
-    def __init__(self,config,mode,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True):
+    def __init__(self,config,mode,dataset_name,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.mode = mode
@@ -50,11 +51,14 @@ class SyntaxBertModel(BertPreTrainedModel):
         if mode == "no_syntax":
             self.pooler = BertPooler(config) 
             self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-            #self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(class_weights)) 
+            if dataset_name in ["chemprot"]:
+                self.loss_fct = CrossEntropyLoss(weight=torch.Tensor(np.log(class_weights[dataset_name]))) # log(N/Nc)
+            else:
+                self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights[dataset_name]))) 
         elif mode == "probe_only":
             self.classifier = nn.Linear(config.hidden_size,self.probe_dim)          
  
-        logger.info(f"SyntaxBERT loaded: num of labels={config.num_labels}; mode={mode}; layer index={layer_index}; " + \
+        logger.info(f"SyntaxBERT loaded for dataset {dataset_name}: num of labels={config.num_labels}; mode={mode}; layer index={layer_index}; " + \
                     f"probe type={probe_type}; probe dimension={self.probe_dim}")
 
         self.init_weights()
@@ -69,7 +73,8 @@ class SyntaxBertModel(BertPreTrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                labels=None):
+                labels=None,
+                predict_only=False):
         if self.mode == "no_syntax":
             outputs = self.bert(wps,
                                 attention_mask=attention_mask,
@@ -78,12 +83,12 @@ class SyntaxBertModel(BertPreTrainedModel):
             pooled_output = outputs[1]
             pooled_output = self.dropout(pooled_output)
             logits = self.classifier(pooled_output)
-            loss = None
-            if labels is not None:
-                #loss_fct = BCEWithLogitsLoss(pos_weight=class_weights)
+            if not predict_only:
+                assert labels is not None, "relation labels are NOT given."
                 loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
-            output = (logits,) + outputs[2:]
-            return ((loss,) + output) if loss is not None else output
+                return  (loss, logits)
+            else:
+                return (logits,) 
 
         elif self.mode == "probe_only":
             # use the output of the indicated layer
@@ -100,15 +105,17 @@ class SyntaxBertModel(BertPreTrainedModel):
             else:
                 logits = sequence_output
             token_logits = []
-            for logit, ma, key, mask in zip(logits,maps,keys,masks):
+            for logit, ma, key in zip(logits,maps,keys):
                 token_logit = self._from_wps_to_token(logit,ma).to(next(self.parameters()).device)
                 token_logits.append(torch.index_select(token_logit,0,key))
-            if self.probe_type == "distance":
-                loss = distance_loss(token_logits,dist_matrixs,masks)
-            elif self.probe_type == "depth":
-                loss = depth_loss(token_logits,depths,masks)
-            output = (token_logits,)
-            return ((loss,) + output) if loss is not None else output
+            if not predict_only:
+                if self.probe_type == "distance":
+                    loss = distance_loss(token_logits,dist_matrixs,masks)
+                elif self.probe_type == "depth":
+                    loss = depth_loss(token_logits,depths,masks)
+                return (loss, token_logits)
+            else:
+                return (token_logits,)
 
     def _from_wps_to_token(self,wp_embs,span_indexes):
         curr_ix = 0

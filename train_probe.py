@@ -163,7 +163,7 @@ def main():
     torch.cuda.empty_cache()
     
     set_seed(args)
-    model = SyntaxBertModel.from_pretrained(pretrained_bert_urls[args.model_type],config=config,mode=args.mode,
+    model = SyntaxBertModel.from_pretrained(pretrained_bert_urls[args.model_type],config=config,mode=args.mode,dataset_name=args.dataset_name,
                                             layer_index=args.layer_index,probe_type=args.probe_type,probe_rank=args.probe_rank)
     model.to(args.device)
     #freeze the BERT
@@ -173,7 +173,7 @@ def main():
     if args.mode == "probe_only":
         output_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
     else:
-        output_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}")
+        output_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_seed_{args.seed}_ensemble_{args.ensemble_id}")
 
     if not os.path.exists(output_model_dir):
         os.makedirs(output_model_dir)

@@ -4,13 +4,16 @@ import logging
 import os
 import random
 import time
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from collections import defaultdict
+import pickle
+
 import torch
 import transformers 
 from transformers import BertConfig
+from sklearn.metrics import f1_score
 
 from opt import get_args
 from loader import DataLoader
@@ -21,44 +24,66 @@ from utils.constant import pretrained_bert_urls
 transformers.logging.set_verbosity_error()
 logger = logging.getLogger(__name__)
 
-def evaluate(dataloader,model,probe_type,predict_only=False,return_prediction=False):
+def oh(v):
+    oh_vectors = np.zeros_like(v)
+    for line in v:
+        oh_vectors[np.argmax(line)] = 1
+    return oh_vectors
+
+def evaluate(dataloader,model,mode,probe_type,predict_only=False,return_prediction=False):
     eval_loss = 0.0
     nb_eval_steps = 0
     syntactic_metric_per_length = defaultdict(list)
     model.eval()
 
-    if probe_type == "distance":
-        probe_func = correlation_distance
-        gold_attrib = "dist_matrixs"
-    elif probe_type == "depth":
-        probe_func = correlation_depth
-        gold_attrib = "depths"
+    if mode == "probe_only":
+        if probe_type == "distance":
+            probe_func = correlation_distance
+            gold_attrib = "dist_matrixs"
+        elif probe_type == "depth":
+            probe_func = correlation_depth
+            gold_attrib = "depths"
+    elif mode == "no_syntax":
+        gold_attrib = "relations"
+        all_golds = []
     
     if return_prediction:
         all_preds = []
 
     for batch in dataloader:
         with torch.no_grad():
-            loss, logits = model(**batch)[:2]
-     
-            if probe_type == "distance":
-                preds = [((t.unsqueeze(1) - t.unsqueeze(0))**2).sum(-1) for t in logits]
-                #print([t.shape for t in logits])
-                #print([t.shape for t in preds])
-            elif probe_type == "depth":
-                preds = [(t**2).sum(-1) for t in logits]
-            preds = [t.detach().cpu().numpy() for t in preds]
+            if predict_only:
+                logits = model(**batch,predict_only=predict_only)[0]
+            else:
+                loss, logits = model(**batch,predict_only=predict_only)[:2]
+            
+            if mode == "probe_only":
+                if probe_type == "distance":
+                    preds = [((t.unsqueeze(1) - t.unsqueeze(0))**2).sum(-1) for t in logits]
+                elif probe_type == "depth":
+                    preds = [(t**2).sum(-1) for t in logits]
+                
+                golds = [t.detach().cpu().numpy() for t in batch[gold_attrib]]
+                masks = [t.eq(0).detach().cpu().numpy() for t in batch["masks"]]
+                probe_func(golds,preds,masks,syntactic_metric_per_length)
+            
+            elif mode == "no_syntax":
+                all_preds.append(oh(logits.detach().cpu().numpy()))
+                all_golds.append(batch[gold_attrib].detach().cpu().numpy())
+            
             if return_prediction:
                 all_preds += preds
             if not predict_only:
                 eval_loss += loss.item()
                 nb_eval_steps += 1
-            golds = [t.detach().cpu().numpy() for t in batch[gold_attrib]]
-            masks = [t.eq(0).detach().cpu().numpy() for t in batch["masks"]]
-            probe_func(golds,preds,masks,syntactic_metric_per_length)
     
-    mean_correlations_per_length = {length:np.mean(syntactic_metric_per_length[length]) for length in syntactic_metric_per_length}
-    eval_score = np.mean([mean_correlations_per_length[length] for length in mean_correlations_per_length if 5 <= length <= 50])
+    if mode == "probe_only":
+        mean_correlations_per_length = {length:np.mean(syntactic_metric_per_length[length]) for length in syntactic_metric_per_length}
+        eval_score = np.mean([mean_correlations_per_length[length] for length in mean_correlations_per_length if 5 <= length <= 50])
+    elif mode == "no_syntax":
+        all_golds = np.concatenate(all_golds)
+        all_preds = np.concatenate(all_preds)
+        eval_score = f1_score(all_golds,all_preds,average="micro",labels=[1,2,3,4,5])
     
     if not predict_only:
         eval_loss = eval_loss / nb_eval_steps
@@ -67,7 +92,7 @@ def evaluate(dataloader,model,probe_type,predict_only=False,return_prediction=Fa
         eva_outputs = (eval_score,)
         if return_prediction:
             eva_outputs += ([list(l) for l in all_preds],)
-        return eval_outputs
+        return eva_outputs
 
 def main():
     start_time = time.time()
@@ -102,7 +127,7 @@ def main():
     if args.model == "probe_only":
         input_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
     else:
-        input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}")    
+        input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_seed_{args.seed}_ensemble_{args.ensemble_id}")    
 
     train_probe = True
     if args.probe_only_no_train:
@@ -110,11 +135,11 @@ def main():
         train_probe = False
         input_model_dir = pretrained_bert_urls[args.model_type]
 
-    model = SyntaxBertModel.from_pretrained(input_model_dir,config=config,mode=args.mode,
+    model = SyntaxBertModel.from_pretrained(input_model_dir,config=config,mode=args.mode,dataset_name=args.dataset_name,
                                             layer_index=args.layer_index,probe_type=args.probe_type,train_probe=train_probe)
     model.to(args.device)
 
-    eva_outputs = evaluate(test_dataloader,model,args.probe_type,True,args.save_predictions)
+    eva_outputs = evaluate(test_dataloader,model,args.mode,args.probe_type,True,args.save_predictions)
     if args.probe_only_no_train:
         output_fn = "./no_trained_probe_results.txt"
     else:
@@ -123,7 +148,7 @@ def main():
     with open(output_fn,"a+") as f:
         f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{eva_outputs[0]}\n")
 
-    if len(eva_outputs) > 1:
+    if args.save_predictions:
         with open(os.path.join(input_model_dir,"preds.pkl"),"wb") as f:
             pickle.dump(eva_outputs[1],f,pickle.HIGHEST_PROTOCOL)
             logger.info("probe predictions saved.")

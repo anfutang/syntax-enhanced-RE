@@ -6,11 +6,7 @@ import pickle
 from tqdm import tqdm
 from argparse import ArgumentParser
 from transformers import AutoTokenizer
-
-pretrained_bert_urls = {"bert":"bert-base-uncased",
-                        "biobert":"dmis-lab/biobert-base-cased-v1.1",
-                        "scibert":"allenai/scibert_scivocab_uncased",
-                        "roberta":"roberta-base"}
+from utils.constant import pretrained_bert_urls
 
 def get_wps_to_tokens(tokens,wp_ids,tokenizer):
     wp_to_token_map = [1]

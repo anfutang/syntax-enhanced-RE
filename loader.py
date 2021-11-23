@@ -4,6 +4,9 @@ import pandas as pd
 import logging
 import torch
 import pickle
+from sklearn.preprocessing import MultiLabelBinarizer
+
+lb = MultiLabelBinarizer(classes=[0,3,4,5,6,9])
 
 logger = logging.getLogger(__name__)
 
@@ -17,39 +20,42 @@ class DataLoader(object):
 
         wp_data = pickle.load(open(os.path.join(path,f"wp_{name}.pkl"),"rb"))
         label_data = pickle.load(open(os.path.join(path,f"syntactic_probe_labels_{name}.pkl"),"rb"))
-        self.wps = wp_data["wps"]
+        wps = wp_data["wps"]
 
         if mode != "probe_only":
-            self.labels = label_data["relations"]
+            labels = label_data["relations"]
             num_examples = len(self.labels)
         if mode != "no_syntax":
-            self.maps = wp_data["map"]
-            self.dist_matrixs = label_data["distance_matrix"]
-            self.depths = label_data["depths"]
-            self.masks = label_data["mask"]
-            self.keys = label_data["keys"]
+            maps = wp_data["map"]
+            dist_matrixs = label_data["distance_matrix"]
+            depths = label_data["depths"]
+            masks = label_data["mask"]
+            keys = label_data["keys"]
             num_examples = len(self.depths)
 
         if name == "train":
             indexes = list(range(num_examples))
             np.random.shuffle(indexes)
             if mode != "probe_only":
-                self.labels = [self.labels[i] for i in indexes]
+                labels = [self.labels[i] for i in indexes]
             if mode != "no_syntax":
-                self.wps = [self.wps[i] for i in indexes]
-                self.maps = [self.maps[i] for i in indexes]
-                self.dist_matrixs = [self.dist_matrixs[i] for i in indexes]
-                self.depths = [self.depths[i] for i in indexes]
-                self.masks = [self.masks[i] for i in indexes]
-                self.keys = [self.keys[i] for i in indexes]
+                wps = [self.wps[i] for i in indexes]
+                maps = [self.maps[i] for i in indexes]
+                dist_matrixs = [self.dist_matrixs[i] for i in indexes]
+                depths = [self.depths[i] for i in indexes]
+                masks = [self.masks[i] for i in indexes]
+                keys = [self.keys[i] for i in indexes]
 
         # order: wordpiece_ids, maps, keys, relation_labels, dist_matrix, depth_list
         if mode == "probe_only":
-            self.data = list(zip(self.wps,self.maps,self.keys,self.masks,self.dist_matrixs,self.depths))
-        elif mode == "no_syntax":
-            self.data = list(zip(self.wps,self.labels))
+            self.data = list(zip(wps,maps,keys,masks,dist_matrixs,depths))
         else:
-            self.data = list(zip(self.wps,self.maps,self.keys,self.masks,self.labels,self.dist_matrixs,self.depths))
+            if type(labels[0]) == str:
+                labels = convert_labels(labels)
+            if mode == "no_syntax":
+                self.data = list(zip(wps,labels))
+            else:
+                self.data = list(zip(wps,maps,keys,masks,labels,dist_matrixs,depths))
         
         self.data = [self.data[i:i+batch_size] for i in range(0,num_examples,batch_size)] 
         logger.info(f"{name}: {len(self.data)} batches generated.")
@@ -86,7 +92,7 @@ class DataLoader(object):
                     "maps":unzip_batch[1],
                     "keys":[torch.Tensor(lst).int().to(self.device) for lst in unzip_batch[2]],
                     "masks":[torch.Tensor(lst).eq(0).to(self.device) for lst in unzip_batch[3]],
-                    "labels":torch.Tensor([int(i) for i in unzip_batch[4]]).to(self.device),
+                    "labels":torch.nn.Softmax(torch.Tensor(unzip_batch[4])).to(self.device),
                     "dist_matrixs":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[5]],
                     "depths":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[6]]}
 
@@ -94,4 +100,5 @@ class DataLoader(object):
         for i in range(self.__len__()):
             yield self.__getitem__(i)
 
-
+def convert_labels(labels):
+    return lb.fit_transform([list(map(int,l.split())) for l in labels])

@@ -12,6 +12,8 @@ def get_args():
                          help="abbreviation of model to use")
     parser.add_argument("--config_name_or_path", default="", type=str, 
                          help="Path to pre-trained config or shortcut name selected in the list")
+    parser.add_argument("--dataset_name",type=str,default="chemprot",
+                         help="name of the dataset that will be tested")
     parser.add_argument("--model_dir", default=None, type=str, 
                          help="The output directory where the model predictions and checkpoints will be written.")
     parser.add_argument("--output_dir",default=None,type=str,
@@ -26,7 +28,6 @@ def get_args():
                          help="random seed for ensure reproducibility")
     parser.add_argument("--no_randomness",action="store_true",
                          help="if set, outputs of network are fixed.")
-    #parser.add_argument("--with_syntax",action="store_true",help="if add syntactic loss items in the loss function")
     parser.add_argument("--mode",type=str,default="probe_only",help="set the mode for finetuning model: {'probe_only','no_syntax','with_syntax'}.\n"
                                                                          "-probe_only: use only syntactic labels\n"
                                                                          "-no_syntax: finetune on RE task without introduing the syntax\n"
@@ -54,7 +55,7 @@ def get_args():
     group.add_argument("--max_seq_length", default=512, type=int,
                          help="The maximum input sequence length after tokenization. Sequences longer "
                               "than this will be truncated, sequences shorter will be padded.")
-    group.add_argument("--num_ensemble",type=int,
+    group.add_argument("--ensemble_id",type=int,default=1,
                          help="number of repetitive experiments to get an ensemble result")
     group.add_argument("--learning_rate",type=float,default=2e-5)
     group.add_argument("--max_grad_norm", default=1.0, type=float,
