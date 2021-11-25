@@ -33,9 +33,9 @@ class BertPooler(nn.Module):
         return pooled_output
 
 class SyntaxBertModel(BertPreTrainedModel):
-    def __init__(self,config,mode,dataset_name,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True):
+    def __init__(self,config,mode,dataset_name,num_labels=2,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True):
         super().__init__(config)
-        self.num_labels = config.num_labels
+        self.num_labels = num_labels
         self.mode = mode
         self.probe_type = probe_type
         self.layer_index = layer_index
@@ -50,15 +50,16 @@ class SyntaxBertModel(BertPreTrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         if mode == "no_syntax":
             self.pooler = BertPooler(config) 
-            self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+            self.classifier = nn.Linear(config.hidden_size, self.num_labels)
             if dataset_name in ["chemprot"]:
-                self.loss_fct = CrossEntropyLoss(weight=torch.Tensor(np.log(class_weights[dataset_name]))) # log(N/Nc)
+                #print("yes, chemprot!")
+                self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights[dataset_name]))) # log(N/Nc)
             else:
                 self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights[dataset_name]))) 
         elif mode == "probe_only":
             self.classifier = nn.Linear(config.hidden_size,self.probe_dim)          
  
-        logger.info(f"SyntaxBERT loaded for dataset {dataset_name}: num of labels={config.num_labels}; mode={mode}; layer index={layer_index}; " + \
+        logger.info(f"SyntaxBERT loaded for dataset {dataset_name}: num of labels={num_labels}; mode={mode}; layer index={layer_index}; " + \
                     f"probe type={probe_type}; probe dimension={self.probe_dim}")
 
         self.init_weights()
@@ -85,6 +86,7 @@ class SyntaxBertModel(BertPreTrainedModel):
             logits = self.classifier(pooled_output)
             if not predict_only:
                 assert labels is not None, "relation labels are NOT given."
+                #print(logits.shape,labels.shape)
                 loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
                 return  (loss, logits)
             else:

@@ -36,7 +36,7 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
 
     t_total = len(train_dataloader) * NUM_EPOCHS
     
-    logger.info(f"===number of epochs:{NUM_EPOCHS}; number of steps:{t_total}; learning rate:{args.learning_rate}")
+    logger.info(f"===ensemble id:{args.ensemble_id}; number of steps:{t_total}; learning rate:{args.learning_rate}")
     optimizer = Adam(model.parameters(),lr=args.learning_rate)
 
     # Train
@@ -79,7 +79,7 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
                 logger.info(f"training loss = {(tr_loss - logging_loss)/args.logging_steps} | global step = {global_step} epoch = {epoch}")
                 logging_loss = tr_loss
 
-        dev_loss, dev_score = evaluate(dev_dataloader,model,args.probe_type)
+        dev_loss, dev_score = evaluate(dev_dataloader,model,args.mode,args.probe_type)
         dev_loss_record.append(dev_loss)
         dev_score_record.append(dev_score)
 
@@ -127,7 +127,8 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
 def main():
     start_time = time.time()
     args = get_args()
-    
+   
+    logger.info("training...") 
     # Setup CUDA, GPU & distributed training
     if not args.force_cpu and not torch.cuda.is_available():
         logger.info("NO available GPU. STOPPED. If you want to continue without GPU, add --force_cpu")
@@ -158,17 +159,19 @@ def main():
 
     train_dataloader = DataLoader(args.data_dir,"train",args.mode,args.seed,args.batch_size,args.device)
     dev_dataloader = DataLoader(args.data_dir,"dev",args.mode,args.seed,args.batch_size,args.device)
-
+    
+    logger.info("data loaded.")
     # Evaluate the best model on Test set
     torch.cuda.empty_cache()
     
     set_seed(args)
-    model = SyntaxBertModel.from_pretrained(pretrained_bert_urls[args.model_type],config=config,mode=args.mode,dataset_name=args.dataset_name,
+    model = SyntaxBertModel.from_pretrained(pretrained_bert_urls[args.model_type],config=config,mode=args.mode,dataset_name=args.dataset_name,num_labels=args.num_labels,
                                             layer_index=args.layer_index,probe_type=args.probe_type,probe_rank=args.probe_rank)
     model.to(args.device)
-    #freeze the BERT
-    for param in model.bert.parameters():
-        param.requires_grad = False
+    if args.freeze_bert:
+        #freeze the BERT
+        for param in model.bert.parameters():
+            param.requires_grad = False
 
     if args.mode == "probe_only":
         output_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")

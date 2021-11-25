@@ -26,11 +26,12 @@ logger = logging.getLogger(__name__)
 
 def oh(v):
     oh_vectors = np.zeros_like(v)
-    for line in v:
-        oh_vectors[np.argmax(line)] = 1
+    for i, line in enumerate(v):
+        oh_vectors[i,np.argmax(line)] = 1
     return oh_vectors
 
-def evaluate(dataloader,model,mode,probe_type,predict_only=False,return_prediction=False):
+def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_prediction=False):
+    print("evaluating...")
     eval_loss = 0.0
     nb_eval_steps = 0
     syntactic_metric_per_length = defaultdict(list)
@@ -44,7 +45,8 @@ def evaluate(dataloader,model,mode,probe_type,predict_only=False,return_predicti
             probe_func = correlation_depth
             gold_attrib = "depths"
     elif mode == "no_syntax":
-        gold_attrib = "relations"
+        gold_attrib = "labels"
+        all_preds = []
         all_golds = []
     
     if return_prediction:
@@ -62,11 +64,10 @@ def evaluate(dataloader,model,mode,probe_type,predict_only=False,return_predicti
                     preds = [((t.unsqueeze(1) - t.unsqueeze(0))**2).sum(-1) for t in logits]
                 elif probe_type == "depth":
                     preds = [(t**2).sum(-1) for t in logits]
-                
+                preds = [t.detach().cpu().numpy() for t in preds] 
                 golds = [t.detach().cpu().numpy() for t in batch[gold_attrib]]
                 masks = [t.eq(0).detach().cpu().numpy() for t in batch["masks"]]
-                probe_func(golds,preds,masks,syntactic_metric_per_length)
-            
+                probe_func(golds,preds,masks,syntactic_metric_per_length) 
             elif mode == "no_syntax":
                 all_preds.append(oh(logits.detach().cpu().numpy()))
                 all_golds.append(batch[gold_attrib].detach().cpu().numpy())
@@ -83,6 +84,11 @@ def evaluate(dataloader,model,mode,probe_type,predict_only=False,return_predicti
     elif mode == "no_syntax":
         all_golds = np.concatenate(all_golds)
         all_preds = np.concatenate(all_preds)
+        print(all_golds.shape,all_preds.shape)
+        print(all_golds)
+        print('*'*10)
+        print(all_preds)
+        print('*'*10)
         eval_score = f1_score(all_golds,all_preds,average="micro",labels=[1,2,3,4,5])
     
     if not predict_only:
@@ -124,8 +130,9 @@ def main():
     test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
 
     set_seed(args)
-    if args.model == "probe_only":
-        input_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+    if args.mode == "probe_only":
+        #input_model_dir = os.path.join(args.model_dir,f"{args.mode}_{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
+        input_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
     else:
         input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_seed_{args.seed}_ensemble_{args.ensemble_id}")    
 
@@ -135,7 +142,7 @@ def main():
         train_probe = False
         input_model_dir = pretrained_bert_urls[args.model_type]
 
-    model = SyntaxBertModel.from_pretrained(input_model_dir,config=config,mode=args.mode,dataset_name=args.dataset_name,
+    model = SyntaxBertModel.from_pretrained(input_model_dir,config=config,mode=args.mode,dataset_name=args.dataset_name,num_labels=args.num_labels,
                                             layer_index=args.layer_index,probe_type=args.probe_type,train_probe=train_probe)
     model.to(args.device)
 
@@ -146,7 +153,7 @@ def main():
         output_fn = "./probe_results.txt"
 
     with open(output_fn,"a+") as f:
-        f.write(f"{args.model_type}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{eva_outputs[0]}\n")
+        f.write(f"{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{eva_outputs[0]}\n")
 
     if args.save_predictions:
         with open(os.path.join(input_model_dir,"preds.pkl"),"wb") as f:

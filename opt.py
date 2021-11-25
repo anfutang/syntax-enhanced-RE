@@ -35,8 +35,11 @@ def get_args():
     parser.add_argument("--probe_type",type=str,help="choose the type of probe; only set this option if mode is set to PROBE_ONLY. Under the mode WITH_SYNTAX,"
                                                      "all probe losses will be used.")
     parser.add_argument("--probe_only_no_train",action="store_true",help="only set this when probe_type is PROBE_ONLY; if set, raw representations from BERT will be used without training a linear classifier.")
+    parser.add_argument("--save_predictions",action="store_true",help="set to save raw predictions on the chosen dataset.")
     parser.add_argument("--layer_index",type=int,default=12,help="indicate outputs of which layer in BERT to use.")
     parser.add_argument("--probe_rank",type=int,default=-1,help="the linear transformation rank for chosen syntactic probe.")
+    parser.add_argument("--freeze_bert",action="store_true",help="if set, only task-specific layers for downstream tasks after BERT will be trained.:")    
+
     parser.add_argument("--batch_size", default=32, type=int)
 
     group = parser.add_argument_group('--training_options')
