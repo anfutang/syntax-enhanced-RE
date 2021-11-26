@@ -7,6 +7,7 @@ import pickle
 from sklearn.preprocessing import MultiLabelBinarizer
 
 lb = MultiLabelBinarizer(classes=[0,3,4,5,6,9])
+#m = torch.nn.Softmax(dim=1)
 
 logger = logging.getLogger(__name__)
 
@@ -24,27 +25,27 @@ class DataLoader(object):
 
         if mode != "probe_only":
             labels = label_data["relations"]
-            num_examples = len(self.labels)
+            num_examples = len(labels)
         if mode != "no_syntax":
             maps = wp_data["map"]
             dist_matrixs = label_data["distance_matrix"]
             depths = label_data["depths"]
             masks = label_data["mask"]
             keys = label_data["keys"]
-            num_examples = len(self.depths)
+            num_examples = len(depths)
 
         if name == "train":
             indexes = list(range(num_examples))
             np.random.shuffle(indexes)
             if mode != "probe_only":
-                labels = [self.labels[i] for i in indexes]
+                labels = [labels[i] for i in indexes]
             if mode != "no_syntax":
-                wps = [self.wps[i] for i in indexes]
-                maps = [self.maps[i] for i in indexes]
-                dist_matrixs = [self.dist_matrixs[i] for i in indexes]
-                depths = [self.depths[i] for i in indexes]
-                masks = [self.masks[i] for i in indexes]
-                keys = [self.keys[i] for i in indexes]
+                wps = [wps[i] for i in indexes]
+                maps = [maps[i] for i in indexes]
+                dist_matrixs = [dist_matrixs[i] for i in indexes]
+                depths = [depths[i] for i in indexes]
+                masks = [masks[i] for i in indexes]
+                keys = [keys[i] for i in indexes]
 
         # order: wordpiece_ids, maps, keys, relation_labels, dist_matrix, depth_list
         if mode == "probe_only":
@@ -52,6 +53,7 @@ class DataLoader(object):
         else:
             if type(labels[0]) == str:
                 labels = convert_labels(labels)
+                #print(labels)
             if mode == "no_syntax":
                 self.data = list(zip(wps,labels))
             else:
@@ -75,9 +77,13 @@ class DataLoader(object):
         max_length = max(map(len,wps))
         wps = torch.Tensor([wp + [0] * (max_length-len(wp)) for wp in wps]).long().to(self.device)
         #print(wps.shape)
+        #print(list(unzip_batch[1]))
+        #print(len(list(unzip_batch[1])))
         if self.mode == "no_syntax":
+            #print(torch.Tensor(unzip_batch[1]))
+            #print('*'*10)
             assert len(unzip_batch) == 2, "mode NO_SYNTAX and input data do not match."
-            return {"wps":wps,"labels":torch.Tensor([int(i) for i in unzip_batch[1]]).to(self.device)}
+            return {"wps":wps,"labels":torch.Tensor(unzip_batch[1]).float().to(self.device)}
         elif self.mode == "probe_only":
             assert len(unzip_batch) == 6, "mode PROBE_ONLY and input data do not match."
             return {"wps":wps,
@@ -92,7 +98,7 @@ class DataLoader(object):
                     "maps":unzip_batch[1],
                     "keys":[torch.Tensor(lst).int().to(self.device) for lst in unzip_batch[2]],
                     "masks":[torch.Tensor(lst).eq(0).to(self.device) for lst in unzip_batch[3]],
-                    "labels":torch.nn.Softmax(torch.Tensor(unzip_batch[4])).to(self.device),
+                    "labels":torch.Tensor(unzip_batch[4]).float().to(self.device),
                     "dist_matrixs":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[5]],
                     "depths":[torch.Tensor(lst).to(self.device) for lst in unzip_batch[6]]}
 
@@ -101,4 +107,4 @@ class DataLoader(object):
             yield self.__getitem__(i)
 
 def convert_labels(labels):
-    return lb.fit_transform([list(map(int,l.split())) for l in labels])
+    return lb.fit_transform([list(map(int,l.split())) for l in labels]).tolist()
