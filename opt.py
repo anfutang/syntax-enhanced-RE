@@ -39,6 +39,7 @@ def get_args():
     parser.add_argument("--layer_index",type=int,default=12,help="indicate outputs of which layer in BERT to use.")
     parser.add_argument("--probe_rank",type=int,default=-1,help="the linear transformation rank for chosen syntactic probe.")
     parser.add_argument("--freeze_bert",action="store_true",help="if set, only task-specific layers for downstream tasks after BERT will be trained.:")    
+    parser.add_argument("--grid_search",action="store_true",help="if set, results will be stored using a different format.")    
 
     parser.add_argument("--batch_size", default=32, type=int)
 

@@ -54,10 +54,16 @@ class SyntaxBertModel(BertPreTrainedModel):
             if dataset_name in ["chemprot"]:
                 #print("yes, chemprot!")
                 self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights[dataset_name]))) # log(N/Nc)
+                #self.loss_fct = BCEWithLogitsLoss()
             else:
                 self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights[dataset_name]))) 
         elif mode == "probe_only":
-            self.classifier = nn.Linear(config.hidden_size,self.probe_dim)          
+            self.classifier = nn.Linear(config.hidden_size,self.probe_dim)
+        else:
+            self.clf = nn.Linear(config.hidden_size,self.num_labels)
+            self.clf_dist = nn.Linear(config.hidden_size,self.probe_dim)
+            self.clf_depth = nn.Linear(config.hidden_size,self.probe_dim)
+            self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights[dataset_name])))          
  
         logger.info(f"SyntaxBERT loaded for dataset {dataset_name}: num of labels={num_labels}; mode={mode}; layer index={layer_index}; " + \
                     f"probe type={probe_type}; probe dimension={self.probe_dim}")
@@ -84,6 +90,10 @@ class SyntaxBertModel(BertPreTrainedModel):
             pooled_output = outputs[1]
             pooled_output = self.dropout(pooled_output)
             logits = self.classifier(pooled_output)
+            #print(logits)
+            #print('*'*10)
+            #print(labels)
+            #print('*'*10)
             if not predict_only:
                 assert labels is not None, "relation labels are NOT given."
                 #print(logits.shape,labels.shape)
@@ -91,7 +101,6 @@ class SyntaxBertModel(BertPreTrainedModel):
                 return  (loss, logits)
             else:
                 return (logits,) 
-
         elif self.mode == "probe_only":
             # use the output of the indicated layer
             outputs = self.bert(input_ids=wps,
@@ -118,6 +127,14 @@ class SyntaxBertModel(BertPreTrainedModel):
                 return (loss, token_logits)
             else:
                 return (token_logits,)
+        else:
+            outputs = self.bert(input_ids=wps,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
+            sequence_output = self.dropout(outputs[0])
+            pooled_output = self.dropout(outputs[1])
+            
 
     def _from_wps_to_token(self,wp_embs,span_indexes):
         curr_ix = 0

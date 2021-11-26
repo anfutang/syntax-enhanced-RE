@@ -37,10 +37,10 @@ class DataLoader(object):
         if name == "train":
             indexes = list(range(num_examples))
             np.random.shuffle(indexes)
+            wps = [wps[i] for i in indexes]
             if mode != "probe_only":
                 labels = [labels[i] for i in indexes]
             if mode != "no_syntax":
-                wps = [wps[i] for i in indexes]
                 maps = [maps[i] for i in indexes]
                 dist_matrixs = [dist_matrixs[i] for i in indexes]
                 depths = [depths[i] for i in indexes]
@@ -52,7 +52,9 @@ class DataLoader(object):
             self.data = list(zip(wps,maps,keys,masks,dist_matrixs,depths))
         else:
             if type(labels[0]) == str:
+                #print(labels)
                 labels = convert_labels(labels)
+                #print('-'*10)
                 #print(labels)
             if mode == "no_syntax":
                 self.data = list(zip(wps,labels))
@@ -80,8 +82,6 @@ class DataLoader(object):
         #print(list(unzip_batch[1]))
         #print(len(list(unzip_batch[1])))
         if self.mode == "no_syntax":
-            #print(torch.Tensor(unzip_batch[1]))
-            #print('*'*10)
             assert len(unzip_batch) == 2, "mode NO_SYNTAX and input data do not match."
             return {"wps":wps,"labels":torch.Tensor(unzip_batch[1]).float().to(self.device)}
         elif self.mode == "probe_only":

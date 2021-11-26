@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import BCEWithLogitsLoss
@@ -19,19 +20,19 @@ class BertPooler(nn.Module):
 class BertForSequenceClassification(BertPreTrainedModel):
     def __init__(self, config, num_labels):
         super().__init__(config)
-        self.num_labels = config.num_labels
+        self.num_labels = num_labels
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.pooler = BertPooler(config) 
         self.classifier = nn.Linear(config.hidden_size,num_labels)
-        self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(class_weights))       
+        self.loss_fct = BCEWithLogitsLoss(pos_weight=torch.Tensor(np.log(class_weights["chemprot"])))      
  
         self.init_weights()
 
     def forward(
         self,
-        input_ids=None,
+        wps=None,
         attention_mask=None,
         token_type_ids=None,
         position_ids=None,
@@ -40,9 +41,11 @@ class BertForSequenceClassification(BertPreTrainedModel):
         labels=None,
         output_attentions=None,
         output_hidden_states=None,
+        predict_only=False,
+        return_predictions=False,
 ):
         outputs = self.bert(
-            input_ids,
+            wps,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
@@ -55,6 +58,8 @@ class BertForSequenceClassification(BertPreTrainedModel):
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
-        loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
-
-        return (loss,logits) + outputs[2:]
+        if predict_only:
+            return (logits,)
+        else:
+            loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
+            return (loss,logits) + outputs[2:]

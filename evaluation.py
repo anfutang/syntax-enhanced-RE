@@ -31,7 +31,7 @@ def oh(v):
     return oh_vectors
 
 def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_prediction=False):
-    print("evaluating...")
+    #print("evaluating...")
     eval_loss = 0.0
     nb_eval_steps = 0
     syntactic_metric_per_length = defaultdict(list)
@@ -69,6 +69,12 @@ def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_pre
                 masks = [t.eq(0).detach().cpu().numpy() for t in batch["masks"]]
                 probe_func(golds,preds,masks,syntactic_metric_per_length) 
             elif mode == "no_syntax":
+                #print(loss)
+                #print('='*10)
+                #print(logits)
+                #print('*'*10)
+                #print(batch["labels"])
+                #print('*'*10)
                 all_preds.append(oh(logits.detach().cpu().numpy()))
                 all_golds.append(batch[gold_attrib].detach().cpu().numpy())
             
@@ -84,13 +90,13 @@ def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_pre
     elif mode == "no_syntax":
         all_golds = np.concatenate(all_golds)
         all_preds = np.concatenate(all_preds)
-        print(all_golds.shape,all_preds.shape)
-        print(all_golds)
-        print('*'*10)
-        print(all_preds)
-        print('*'*10)
+        #print(all_golds.shape,all_preds.shape)
+        #print(all_golds)
+        #print('*'*10)
+        #print(all_preds)
+        #print('*'*10)
         eval_score = f1_score(all_golds,all_preds,average="micro",labels=[1,2,3,4,5])
-    
+           
     if not predict_only:
         eval_loss = eval_loss / nb_eval_steps
         return eval_loss, eval_score
@@ -114,9 +120,9 @@ def main():
     args.device = device
 
     # Setup logging
-    log_fn = "inference_log"
+    log_fn = "logging/inference_log"
     if args.probe_only_no_train:
-        log_fn = "inference_log_no_trained_probe"
+        log_fn = "logging/inference_log_no_trained_probe"
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename=log_fn,filemode='w')
     logger.warning("device: %s, n_gpu: %s",device, args.n_gpu)
 
@@ -153,7 +159,7 @@ def main():
         output_fn = "./probe_results.txt"
 
     with open(output_fn,"a+") as f:
-        f.write(f"{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{eva_outputs[0]}\n")
+        f.write(f"{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{args.ensemble_id}\t{eva_outputs[0]}\n")
 
     if args.save_predictions:
         with open(os.path.join(input_model_dir,"preds.pkl"),"wb") as f:
