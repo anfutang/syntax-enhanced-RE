@@ -2,7 +2,6 @@ from __future__ import absolute_import, division, print_function
 
 import logging
 import os
-import random
 import time
 from collections import defaultdict
 
@@ -68,13 +67,7 @@ def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_pre
                 golds = [t.detach().cpu().numpy() for t in batch[gold_attrib]]
                 masks = [t.eq(0).detach().cpu().numpy() for t in batch["masks"]]
                 probe_func(golds,preds,masks,syntactic_metric_per_length) 
-            elif mode == "no_syntax":
-                #print(loss)
-                #print('='*10)
-                #print(logits)
-                #print('*'*10)
-                #print(batch["labels"])
-                #print('*'*10)
+            else:
                 all_preds.append(oh(logits.detach().cpu().numpy()))
                 all_golds.append(batch[gold_attrib].detach().cpu().numpy())
             
@@ -87,7 +80,7 @@ def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_pre
     if mode == "probe_only":
         mean_correlations_per_length = {length:np.mean(syntactic_metric_per_length[length]) for length in syntactic_metric_per_length}
         eval_score = np.mean([mean_correlations_per_length[length] for length in mean_correlations_per_length if 5 <= length <= 50])
-    elif mode == "no_syntax":
+    else:
         all_golds = np.concatenate(all_golds)
         all_preds = np.concatenate(all_preds)
         #print(all_golds.shape,all_preds.shape)
@@ -133,10 +126,7 @@ def main():
 
     config = BertConfig.from_pretrained(args.config_name_or_path)
 
-    if args.dev:
-        test_dataloader = DataLoader(args.data_dir,"dev",args.mode,args.seed,args.batch_size,args.device)
-    else:
-        test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
+    test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
 
     set_seed(args)
     if args.mode == "probe_only":
@@ -144,8 +134,6 @@ def main():
         input_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
     else:
         input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_seed_{args.seed}_ensemble_{args.ensemble_id}")    
-        if args.grid_search:
-            input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_{args.batch_size}_{args.learning_rate}/seed_{args.seed}_ensemble_{args.ensemble_id}")
 
     train_probe = True
     if args.probe_only_no_train:
@@ -163,16 +151,13 @@ def main():
     else:
         output_fn = "./probe_results.txt"
 
-    dataset_str = "test"
-    if args.dev:
-        dataset_str = "dev"
     with open(output_fn,"a+") as f:
-        f.write(f"{dataset_str}\t{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{args.ensemble_id}\t{eva_outputs[0]}\n")
+        f.write(f"{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{args.ensemble_id}\t{eva_outputs[0]}\n")
 
     if args.save_predictions:
         with open(os.path.join(input_model_dir,"preds.pkl"),"wb") as f:
             pickle.dump(eva_outputs[1],f,pickle.HIGHEST_PROTOCOL)
-            logger.info("predictions saved.")
+            logger.info("probe predictions saved.")
     
     end_time = time.time()
     logger.info(f"time consumed (inference): {(end_time-start_time):.3f} s.")

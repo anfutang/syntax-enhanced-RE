@@ -11,7 +11,7 @@ import torch
 import transformers 
 from transformers import BertConfig
 from torch.optim import Adam
-from pure_model import BertForSequenceClassification
+#from pure_model import BertForSequenceClassification
 
 from opt import get_args
 from loader import DataLoader
@@ -62,9 +62,7 @@ def train(args,train_dataloader,dev_dataloader,model,output_dir):
         #epoch_iterator = tqdm(train_dataloader)
         for step, batch in enumerate(train_dataloader):
             model.train()
-            loss,logits = model(**batch)
-            #print(torch.argmax(logits,dim=1))
-
+            loss, _ = model(**batch)
             loss.backward() # gradient will be stored in the network
             gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(),args.max_grad_norm)
 

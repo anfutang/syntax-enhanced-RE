@@ -33,13 +33,14 @@ class BertPooler(nn.Module):
         return pooled_output
 
 class SyntaxBertModel(BertPreTrainedModel):
-    def __init__(self,config,mode,dataset_name,num_labels=2,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True):
+    def __init__(self,config,mode,dataset_name,num_labels=2,layer_index=-1,probe_type=None,probe_rank=-1,train_probe=True,syntactic_coef=1):
         super().__init__(config)
         self.num_labels = num_labels
         self.mode = mode
         self.probe_type = probe_type
         self.layer_index = layer_index
         self.train_probe = train_probe
+        self.syntactic_coef = syntactic_coef
         self.num_bert_layers = config.num_hidden_layers
         if probe_rank == -1:
             self.probe_dim = config.hidden_size
@@ -90,15 +91,11 @@ class SyntaxBertModel(BertPreTrainedModel):
             pooled_output = outputs[1]
             pooled_output = self.dropout(pooled_output)
             logits = self.classifier(pooled_output)
-            #print(logits)
-            #print('*'*10)
-            #print(labels)
-            #print('*'*10)
             if not predict_only:
                 assert labels is not None, "relation labels are NOT given."
                 #print(logits.shape,labels.shape)
                 loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1,self.num_labels))
-                return  (loss, logits)
+                return (loss, logits)
             else:
                 return (logits,) 
         elif self.mode == "probe_only":
@@ -115,10 +112,7 @@ class SyntaxBertModel(BertPreTrainedModel):
                 logits = self.classifier(sequence_output)
             else:
                 logits = sequence_output
-            token_logits = []
-            for logit, ma, key in zip(logits,maps,keys):
-                token_logit = self._from_wps_to_token(logit,ma).to(next(self.parameters()).device)
-                token_logits.append(torch.index_select(token_logit,0,key))
+            token_logits = self._get_token_embs(logits,maps,keys)
             if not predict_only:
                 if self.probe_type == "distance":
                     loss = distance_loss(token_logits,dist_matrixs,masks)
@@ -129,12 +123,32 @@ class SyntaxBertModel(BertPreTrainedModel):
                 return (token_logits,)
         else:
             outputs = self.bert(input_ids=wps,
-                                    attention_mask=attention_mask,
-                                    token_type_ids=token_type_ids,
-                                    position_ids=position_ids)
+                                attention_mask=attention_mask,
+                                token_type_ids=token_type_ids,
+                                position_ids=position_ids)
             sequence_output = self.dropout(outputs[0])
             pooled_output = self.dropout(outputs[1])
-            
+            logits = self.clf(pooled_output)
+
+            #use three linear classifiers for three loss functions
+            token_logits_dist = self._get_token_embs(self.clf_dist(pooled_output),maps,keys)
+            token_logits_depth = self._get_token_embs(self.clf_depth(pooled_output),maps,keys)
+
+            if not predict_only:
+                # relation classification loss + distance probe loss + depth probe loss
+                re_loss = self.loss_fct(logits.view(-1,self.num_labels),labels.view(-1,self.num_labels))
+                syntactic_loss = distance_loss(token_logits_dist,dist_matrixs,masks) + depth_loss(token_logits_depth,depths,masks)
+                loss = (re_loss + self.syntactic_coef * torch.sqrt(syntactic_loss)) / (1 + self.syntactic_coef)
+                return (loss, logits)
+            else:
+                return (logits,) 
+    
+    def _get_token_embs(self,wp_embs,maps,keys):
+        token_logits = []
+        for logit, ma, key in zip(wp_embs,maps,keys):
+            token_logit = self._from_wps_to_token(logit,ma).to(next(self.parameters()).device)
+            token_logits.append(torch.index_select(token_logit,0,key))
+        return token_logits
 
     def _from_wps_to_token(self,wp_embs,span_indexes):
         curr_ix = 0
