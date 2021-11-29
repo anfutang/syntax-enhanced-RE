@@ -78,7 +78,7 @@ def evaluate(dataloader,model,mode,probe_type=None,predict_only=False,return_pre
                 all_preds.append(oh(logits.detach().cpu().numpy()))
                 all_golds.append(batch[gold_attrib].detach().cpu().numpy())
             
-            if return_prediction:
+            if return_prediction and mode == "probe_only":
                 all_preds += preds
             if not predict_only:
                 eval_loss += loss.item()
@@ -133,7 +133,10 @@ def main():
 
     config = BertConfig.from_pretrained(args.config_name_or_path)
 
-    test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
+    if args.dev:
+        test_dataloader = DataLoader(args.data_dir,"dev",args.mode,args.seed,args.batch_size,args.device)
+    else:
+        test_dataloader = DataLoader(args.data_dir,"test",args.mode,args.seed,args.batch_size,args.device)
 
     set_seed(args)
     if args.mode == "probe_only":
@@ -141,6 +144,8 @@ def main():
         input_model_dir = os.path.join(args.model_dir,f"{args.model_type}_{args.probe_type}_probe_{args.layer_index}")
     else:
         input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_seed_{args.seed}_ensemble_{args.ensemble_id}")    
+        if args.grid_search:
+            input_model_dir = os.path.join(args.model_dir,f"finetune_{args.mode}_{args.model_type}_{args.batch_size}_{args.learning_rate}/seed_{args.seed}_ensemble_{args.ensemble_id}")
 
     train_probe = True
     if args.probe_only_no_train:
@@ -158,13 +163,16 @@ def main():
     else:
         output_fn = "./probe_results.txt"
 
+    dataset_str = "test"
+    if args.dev:
+        dataset_str = "dev"
     with open(output_fn,"a+") as f:
-        f.write(f"{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{args.ensemble_id}\t{eva_outputs[0]}\n")
+        f.write(f"{dataset_str}\t{args.model_type}\t{args.mode}\t{args.probe_type}\t{args.layer_index}\t{args.probe_rank}\t{args.ensemble_id}\t{eva_outputs[0]}\n")
 
     if args.save_predictions:
         with open(os.path.join(input_model_dir,"preds.pkl"),"wb") as f:
             pickle.dump(eva_outputs[1],f,pickle.HIGHEST_PROTOCOL)
-            logger.info("probe predictions saved.")
+            logger.info("predictions saved.")
     
     end_time = time.time()
     logger.info(f"time consumed (inference): {(end_time-start_time):.3f} s.")

@@ -147,7 +147,10 @@ def main():
     if args.mode == "probe_only":
         logging_fn = f"training_log_{args.model_type}_{args.mode}_{args.probe_type}_probe_{args.layer_index}"
     else:
-        logging_fn = f"training_log_{args.model_type}_{args.mode}"
+        if args.grid_search:
+            logging_fn = f"training_log_{args.model_type}_{args.mode}_gs"
+        else:
+            logging_fn = f"training_log_{args.model_type}_{args.mode}"
 
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',datefmt='%m/%d/%Y %H:%S',level=logging.INFO,filename=os.path.join("./logging/",logging_fn),filemode='w')
     logger.warning("device: %s, n_gpu: %s",device, args.n_gpu)

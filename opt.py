@@ -40,10 +40,10 @@ def get_args():
     parser.add_argument("--probe_rank",type=int,default=-1,help="the linear transformation rank for chosen syntactic probe.")
     parser.add_argument("--freeze_bert",action="store_true",help="if set, only task-specific layers for downstream tasks after BERT will be trained.:")    
     parser.add_argument("--grid_search",action="store_true",help="if set, results will be stored using a different format.")    
-
-    parser.add_argument("--batch_size", default=32, type=int)
+    parser.add_argument("--dev",action="store_true",help="evaluation on the validation set; by default, evaluation.py works on the test set.")
 
     group = parser.add_argument_group('--training_options')
+    group.add_argument("--batch_size", default=32, type=int)
     group.add_argument('--logging_steps', type=int, default=50,
                          help="Log every X updates steps.")
     group.add_argument("--monitor",type=str,default="score",
