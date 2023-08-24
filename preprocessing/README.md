@@ -36,7 +36,8 @@ sh preprocess.sh DATASET_NAME DATA_FOLDER_NAME
 
 *️⃣ You can also make a pass using the demo data:
 ```
-sh preprocess.sh ../demo_data/ demo
+cd preprocessing
+sh preprocess.sh demo ../demo_data
 ```
 
 *️⃣ Find data for different types of models:
