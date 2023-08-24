@@ -73,7 +73,7 @@ if ! test -d $op; then mkdir $op; fi
 op=${INPUT_DIR}/constituency_files/${DATASET_NAME}
 if ! test -d $op; then mkdir $op; fi
 
-printf "######## generating constituency files for CE and CT models."
+printf "######## generating constituency files for CE and CT models...\n"
 
 python3 generate_constituency_files.py --wp_file_dir $wp_ip --word_file_dir $word_ip --const_parse_dir $const_ip --output_dir $op > ${op}/log.txt
 
@@ -88,7 +88,7 @@ if ! test -d $op; then mkdir $op; fi
 op=${INPUT_DIR}/dependency_files/${DATASET_NAME}
 if ! test -d $op; then mkdir $op; fi
 
-printf "######## generating adjacency matrices...\n"
+printf "######## generating adjacency matrices (for late-fusion)...\n"
 
 python3 generate_adj_matrices.py --wp_file_dir $wp_ip --word_file_dir $word_ip --dep_parse_dir $dep_ip --output_dir $op > ${op}/log_adj.txt
 
