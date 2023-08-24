@@ -29,7 +29,7 @@ Reinsertion of entity markers and \[CLS\], \[SEP\] comes with linking these toke
 - spans: list of indexes of word pieces that make up a word, i.e. given 'ammonia' (indexed by 2), '##gene' (3), '##s' (4), add \[2,5\] indicating we can retrieve the word pieces of word 'ammoniagenes' by sentence\[2:5\].
 - words: words of each sentence (just merge word pieces to words; the result should contain \[CLS\], \[SEP\] and entity markers).
 
-*️⃣ The following script assumes that 3 wordpiece-level files (described above) are respectively generated for train, dev and test set. They are saved under the directory /DATA_FOLDER_NAME/DATASET_NAME/wordpiece_level_files (set your own DATA_FOLDER_NAME and DATASET_NAME). Use the following command to generate all data:
+*️⃣ The following script assumes that 3 wordpiece-level files (described above) are respectively generated for train, dev and test set. They are saved under the directory /DATA_FOLDER_NAME/wordpiece_level_files/DATASET_NAME/ (set your own DATA_FOLDER_NAME and DATASET_NAME). Use the following command to generate all data:
 ```
 cd preprocessing
 
