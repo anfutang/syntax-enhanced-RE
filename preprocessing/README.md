@@ -32,12 +32,12 @@ Reinsertion of entity markers and \[CLS\], \[SEP\] comes with linking these toke
 *️⃣ The following script assumes that 3 wordpiece-level files (described above) are respectively generated for train, dev and test set. They are saved under the directory /DATA_FOLDER_NAME/DATASET_NAME/wordpiece_level_files (set your own DATA_FOLDER_NAME and DATASET_NAME). Use the following command to generate all data:
 ```
 cd preprocessing
+
 sh preprocess.sh DATASET_NAME DATA_FOLDER_NAME
 ```
 
 *️⃣ You can also make a pass using the demo data:
 ```
-cd preprocessing
 sh preprocess.sh demo ../demo_data
 ```
 
