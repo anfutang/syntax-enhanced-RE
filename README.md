@@ -32,7 +32,7 @@ You can also generate these data using our pre-processing scripts (refer to /pre
 - Stanza 1.3.0 
 - Benepar 0.2.0
 
-🔨 For biomedical use, we use the package CRAFT (by default) of Stanza. If needed, you need to change to a general package replacing the 11-th line in remove_markers.py and the 10-th line in dependency_parse.py with:
+🔨 For biomedical use, we use the package CRAFT (by default) of Stanza. If needed, you need to change Stanza to a general version replacing the 11-th line in remove_markers.py and the 10-th line in dependency_parse.py with:
 ```
 nlp = stanza.Pipeline(lang='en', processors='pos,lemma,tokenize,depparse', tokenize_pretokenized=True, logging_level='FATAL')
 ```
