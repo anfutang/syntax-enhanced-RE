@@ -15,4 +15,8 @@ There are four models either dependency-syntax-enhanced or constituency-syntax-e
 from transformers import AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained("microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract")
 ```
-Refer to the README file in the preprocessing folder for subsequent steps.
+Refer to the README file in the preprocessing folder for subsequent steps (if you want to use your own corpus).
+
+🔨 You can skip pre-processing and download data for syntax-enhanced models (BB-Rel, ChemProt, DrugProt) here:
+
+You can also generate these data using our pre-processing scripts (Refer to /preprocessing/).
