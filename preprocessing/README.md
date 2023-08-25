@@ -38,7 +38,7 @@ sh preprocess.sh DATASET_NAME DATA_FOLDER_NAME
 
 *️⃣ You can also make a pass using the demo data:
 ```
-sh preprocess.sh demo ../demo_data
+sh preprocess.sh demo ../data
 ```
 
 *️⃣ Find data for different types of models:
@@ -55,3 +55,11 @@ sh preprocess.sh demo ../demo_data
 
 ❗In some cases, the entity marker '@' and '$' may not be unique. when there are extra '@' or '$' in the sentence other than entity markers, errors will occur when generating word-level files (under /DATA_FOLDER_NAME/word_level_files/). You need to manually change infos saved in items 'subj_marker_indexes', 'obj_marker_indexes', and 'index_map'. You can make a pass over your dataset to verify if extra '@' or '$' exists.
 
+*️⃣ To generate data for syntax-enhanced models on BB-Rel, ChemProt (Blurb version), DrugProt:
+```
+sh preprocess.sh {bbrel/chemprot/drugprot} ../data
+```
+
+Note that pre-processing on the three corpus may take some time: BB-Rel (); ChemProt (~2 hrs).
+
+You may need enough RAM to pre-process DrugProt. Besides, on the train and test set of DrugProt, you need to manually truncate some sentences to make them affordable for Benepar (the constituency parser).
