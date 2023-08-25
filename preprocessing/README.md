@@ -36,7 +36,7 @@ cd preprocessing
 sh preprocess.sh DATASET_NAME DATA_FOLDER_NAME
 ```
 
-*️⃣ You can also make a pass using the demo data:
+*️⃣ You can make a first simple test using the demo data:
 ```
 sh preprocess.sh demo ../data
 ```
