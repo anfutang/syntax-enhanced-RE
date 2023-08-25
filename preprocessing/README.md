@@ -51,7 +51,7 @@ sh preprocess.sh demo ../data
 
 ⭐ If no error occurs, generated data can be directly passed to syntax-enhanced models.
 
-❗Since the benepar constituency parser can not accept word piece sequence longer than 512, long sentences may cause errors. Indexes of examples on which errors occur will be collected and saved; but you need to manually check these examples and truncate them to a certain length until the tokenized sentence (tokenized by Benepar not BERT) is shorter than 512.
+❗Since the benepar constituency parser can not accept word piece sequence longer than 512, long sentences may cause errors. Indexes of examples on which errors occur will be collected and saved; but you need to manually check these examples and truncate them to a certain length until the tokenized sentence (tokenized by Benepar; not by BERT) is shorter than 512.
 
 ❗In some cases, the entity marker '@' and '$' may not be unique. when there are extra '@' or '$' in the sentence other than entity markers, errors will occur when generating word-level files (under /DATA_FOLDER_NAME/word_level_files/). You need to manually change infos saved in items 'subj_marker_indexes', 'obj_marker_indexes', and 'index_map'. You can make a pass over your dataset to verify if extra '@' or '$' exists.
 
