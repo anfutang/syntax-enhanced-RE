@@ -23,3 +23,17 @@ Refer to the README file in the preprocessing folder for subsequent steps (if yo
 🔨 You can skip pre-processing and download data for syntax-enhanced models (BB-Rel, ChemProt, DrugProt) here:
 
 You can also generate these data using our pre-processing scripts (Refer to /preprocessing/).
+
+### Prerequisites
+
+- Python 3.8.5
+- Pytorch 1.13.0
+- Transformers 4.6.0
+- Stanza 1.3.0 
+- Benepar 0.2.0
+
+🔨 For biomedical use, we use the package CRAFT (by default) of Stanza. You need to change to a general package replacing the 11-th line in remove_markers.py and the 10-th line in dependency_parse.py with:
+```
+nlp = stanza.Pipeline(lang='en', processors='pos,lemma,tokenize,depparse', tokenize_pretokenized=True, logging_level='FATAL')
+```
+
