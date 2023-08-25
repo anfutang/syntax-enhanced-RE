@@ -53,7 +53,7 @@ sh preprocess.sh demo ../data
 
 ❗Since the benepar constituency parser can not accept word piece sequence longer than 512, long sentences may cause errors. Indexes of examples on which errors occur will be collected and saved; but you need to manually check these examples and truncate them to a certain length until the tokenized sentence (tokenized by Benepar; not by BERT) is shorter than 512.
 
-❗In some cases, the entity marker '@' and '$' may not be unique. when there are extra '@' or '$' in the sentence other than entity markers, errors will occur when generating word-level files (under /DATA_FOLDER_NAME/word_level_files/). You need to manually change infos saved in items 'subj_marker_indexes', 'obj_marker_indexes', and 'index_map'. You can make a pass over your dataset to verify if extra '@' or '$' exists.
+❗In some cases, the entity marker '@' and '$' may not be unique. When there exist extra '@' or '$' in the sentence other than entity markers, if they are isolated i.e. no extra '@@' or '$$', this case can be handled. Otherwise, errors will occur when generating word-level files (saved under /DATA_FOLDER_NAME/word_level_files/). You need to manually change the items 'subj_marker_indexes', 'obj_marker_indexes', and 'index_map' in word-level files. You can make a pass over your dataset to verify if extra '@' or '$' exists.
 
 *️⃣ To generate data for syntax-enhanced models on BB-Rel, ChemProt (Blurb version), DrugProt:
 ```
