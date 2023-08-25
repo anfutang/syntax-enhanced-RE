@@ -60,6 +60,6 @@ sh preprocess.sh demo ../data
 sh preprocess.sh {bbrel/chemprot/drugprot} ../data
 ```
 
-Note that pre-processing on the three corpus may take some time: BB-Rel (); ChemProt (~2 hrs).
+Note that pre-processing on the three corpora may be time-consuming: BB-Rel (); ChemProt (~2 hrs); DrugProt (> 6 hrs).
 
 You may need enough RAM to pre-process DrugProt. Besides, on the train and test set of DrugProt, you need to manually truncate some sentences to make them affordable for Benepar (the constituency parser).
