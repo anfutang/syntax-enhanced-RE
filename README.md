@@ -2,8 +2,10 @@
 
 ***Syntax-enhanced RE models with depedency / constituency analysis***
 
-:star: This codebase provides scripts that turn raw WordPiece-tokenized data to ready-to-use data for syntax-enhanced models as described in the paper:
-https://academic.oup.com/database/article/doi/10.1093/database/baac070/6675625. Changes are made including replacing BioBERT with PubMedBERT.
+:star: This codebase provides scripts of applying syntax-enhanced models on biomedical RE datasets as described in the paper:
+https://academic.oup.com/database/article/doi/10.1093/database/baac070/6675625. 
+
+This is an improved version including replacing BioBERT with PubMedBERT and other details.
 
 There are four models either dependency-syntax-enhanced or constituency-syntax-enhanced:
 - CE-PubMedBERT (constituency)
