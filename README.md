@@ -13,7 +13,7 @@ There are four models either dependency-syntax-enhanced or constituency-syntax-e
 - Late-fusion (dependency)
 - MTS-PubMedBERT (dependency)
 
-:star: Pre-processing described here takes WordPiece-tokenized data as input. To perform the first tokenization, it suffices to load the PubMedBERT tokenizer:
+:star: Pre-processing scripts are provided under the directory /preprocessing/. Note that we use PubMedBERT tokenizer for wordpiece-level tokenization before pre-processing (change PubMedBERT to other BERT variants on your need):
 ```
 from transformers import AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained("microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract")
