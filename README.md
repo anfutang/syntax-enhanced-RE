@@ -1,5 +1,6 @@
-# syntax_data_preprocessing
-Data Preprocessing for syntax-enhanced RE models.
+# Syntax-Enhanced Relation Extraction
+
+***Data Preprocessing for syntax-enhanced RE models.***
 
 :star: This codebase provides scripts that turn raw WordPiece-tokenized data to ready-to-use data for syntax-enhanced models as described in the paper:
 https://academic.oup.com/database/article/doi/10.1093/database/baac070/6675625. Changes are made including replacing BioBERT with PubMedBERT.
