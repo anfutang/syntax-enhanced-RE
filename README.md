@@ -22,7 +22,7 @@ Refer to the README file in the preprocessing folder for subsequent steps (if yo
 
 🔨 You can skip pre-processing and download data for syntax-enhanced models (BB-Rel, ChemProt, DrugProt) here:
 
-You can also generate these data using our pre-processing scripts (Refer to /preprocessing/).
+You can also generate these data using our pre-processing scripts (refer to /preprocessing/).
 
 ### Prerequisites
 
