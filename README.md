@@ -5,7 +5,7 @@
 :star: This codebase provides scripts of applying syntax-enhanced models on biomedical RE datasets as described in the paper:
 https://academic.oup.com/database/article/doi/10.1093/database/baac070/6675625. 
 
-This is an improved version including replacing BioBERT with PubMedBERT and some other details.
+This is an improved version including replacing BioBERT with PubMedBERT and some other modifications.
 
 There are four models either dependency-syntax-enhanced or constituency-syntax-enhanced:
 - CE-PubMedBERT (constituency)
